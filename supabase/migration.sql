@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   deleted_at   timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts((SELECT auth.uid()));
+CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id);
 
 -- ─── TRANSACTIONS ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS transactions (
