@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Using gemini-flash-latest as it's the fastest currently available for multimodal PDF parsing
-    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' })
+    // Using gemini-2.5-flash specifically to avoid overloaded generic aliases
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
     const prompt = `
       Sen uzman bir muhasebeci ve veri çıkarıcı yapay zekasın. 
