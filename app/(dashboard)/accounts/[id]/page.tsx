@@ -32,12 +32,12 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
     supabase.from('accounts').select('*').eq('id', id).eq('company_id', companyInfo.id).single(),
     supabase
       .from('transactions')
-      .select('*')
+      .select('*, transaction_lines(*)')
       .eq('account_id', id)
       .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
-      .order('transaction_date', { ascending: false })
-      .limit(20),
+      .order('transaction_date', { ascending: true })
+      .order('created_at', { ascending: true }),
     supabase
       .from('payables')
       .select('*')

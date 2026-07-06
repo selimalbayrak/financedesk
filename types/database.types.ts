@@ -40,6 +40,8 @@ export interface Database {
           category: string
           amount: number // stored as BIGINT kuruş, divide by 100 for display
           currency: string
+          document_type: string | null
+          document_no: string | null
           description: string | null
           reference_no: string | null
           transaction_date: string
@@ -50,6 +52,20 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['transactions']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['transactions']['Insert']>
+      }
+      transaction_lines: {
+        Row: {
+          id: string
+          transaction_id: string
+          item_code: string | null
+          description: string | null
+          quantity: number | null
+          unit_price: number | null
+          amount: number
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['transaction_lines']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['transaction_lines']['Insert']>
       }
       payables: {
         Row: {
@@ -173,6 +189,9 @@ export type AccountUpdate = Database['public']['Tables']['accounts']['Update']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
 
+export type TransactionLine = Database['public']['Tables']['transaction_lines']['Row']
+export type TransactionLineInsert = Database['public']['Tables']['transaction_lines']['Insert']
+
 export type Payable = Database['public']['Tables']['payables']['Row']
 export type PayableInsert = Database['public']['Tables']['payables']['Insert']
 export type PayableUpdate = Database['public']['Tables']['payables']['Update']
@@ -191,4 +210,8 @@ export type PayableWithAccount = Payable & {
 
 export type TransactionWithAccount = Transaction & {
   account: Pick<Account, 'id' | 'name'> | null
+}
+
+export type TransactionWithLines = Transaction & {
+  transaction_lines: TransactionLine[]
 }

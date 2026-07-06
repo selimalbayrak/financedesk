@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { AccountFormSheet } from './account-form-sheet'
+import { AccountLedger } from './ledger/account-ledger'
 import { AccountTypeBadge, StatusBadge } from '@/components/shared/status-badge'
 import { formatCurrency, formatDate, formatDateShort } from '@/lib/utils'
 import type { Account, Transaction, Payable } from '@/types/database.types'
@@ -106,7 +107,7 @@ export function AccountDetailView({ account, transactions, payables, companyId }
             Borç/Alacak ({payables.length})
           </TabsTrigger>
           <TabsTrigger value="transactions">
-            İşlemler ({transactions.length})
+            Hesap Ekstresi ({transactions.length})
           </TabsTrigger>
         </TabsList>
 
@@ -190,40 +191,9 @@ export function AccountDetailView({ account, transactions, payables, companyId }
           </Card>
         </TabsContent>
 
-        {/* Transactions Tab */}
+        {/* Ledger Tab */}
         <TabsContent value="transactions" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              {transactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-10">
-                  Bu cariye ait işlem bulunmuyor.
-                </p>
-              ) : (
-                <div className="divide-y">
-                  {transactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {tx.description ?? tx.category}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(tx.transaction_date)}
-                          {tx.reference_no && ` · ${tx.reference_no}`}
-                        </p>
-                      </div>
-                      <p className={`text-sm font-semibold tabular-nums shrink-0 ${
-                        tx.type === 'credit'
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-rose-600 dark:text-rose-400'
-                      }`}>
-                        {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <AccountLedger transactions={transactions as any} accountId={account.id} />
         </TabsContent>
       </Tabs>
 
