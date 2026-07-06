@@ -5,6 +5,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 const apiKey = process.env.GEMINI_API_KEY || ''
 const genAI = new GoogleGenerativeAI(apiKey)
 
+export const maxDuration = 60 // Vercel timeout extension (Pro max 300, Hobby max 60)
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()

@@ -49,7 +49,7 @@ export function UploadStatementDialog({ open, onOpenChange, accountId }: UploadS
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'İşleme hatası')
+        throw new Error(`${data.error}: ${data.details || ''}`)
       }
 
       setParsedData(data.transactions)
