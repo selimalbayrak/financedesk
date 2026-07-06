@@ -41,6 +41,7 @@ interface PayableFormSheetProps {
   accounts: Pick<Account, 'id' | 'name' | 'company_name'>[]
   payable?: Payable | null
   defaultType?: 'payable' | 'receivable'
+  companyId: string
 }
 
 export function PayableFormSheet({
@@ -49,6 +50,7 @@ export function PayableFormSheet({
   accounts,
   payable,
   defaultType = 'payable',
+  companyId,
 }: PayableFormSheetProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -85,8 +87,10 @@ export function PayableFormSheet({
             updated_at: new Date().toISOString(),
           })
           .eq('id', payable.id)
+          .eq('company_id', companyId)
       } else {
         await supabase.from('payables').insert({
+          company_id: companyId,
           account_id: values.account_id,
           type: values.type,
           description: values.description,
@@ -107,9 +111,9 @@ export function PayableFormSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{isEditing ? 'Edit' : 'New'} Payable / Receivable</SheetTitle>
+          <SheetTitle>{isEditing ? 'Kaydı Düzenle' : 'Yeni Kayıt'}</SheetTitle>
           <SheetDescription>
-            Record an amount owed to or from an account.
+            Tedarikçiye olan borcunuzu veya müşteriden alacağınızı kaydedin.
           </SheetDescription>
         </SheetHeader>
 
@@ -122,7 +126,7 @@ export function PayableFormSheet({
               name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type *</FormLabel>
+                  <FormLabel>Kayıt Tipi *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
@@ -130,8 +134,8 @@ export function PayableFormSheet({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="payable">Payable (I owe)</SelectItem>
-                      <SelectItem value="receivable">Receivable (They owe me)</SelectItem>
+                      <SelectItem value="payable">Borç (Benim ödeyeceğim)</SelectItem>
+                      <SelectItem value="receivable">Alacak (Bana ödenecek)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -145,11 +149,11 @@ export function PayableFormSheet({
               name="account_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Account *</FormLabel>
+                  <FormLabel>Cari Hesap *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select account..." />
+                        <SelectValue placeholder="Cari seçin..." />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -171,9 +175,9 @@ export function PayableFormSheet({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description *</FormLabel>
+                  <FormLabel>Açıklama *</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. January invoice payment" {...field} />
+                    <Input placeholder="Örn: Ocak ayı hizmet bedeli" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -186,7 +190,7 @@ export function PayableFormSheet({
               name="original_amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (₺) *</FormLabel>
+                  <FormLabel>Tutar (₺) *</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -200,7 +204,7 @@ export function PayableFormSheet({
                   </FormControl>
                   {isEditing && (
                     <p className="text-xs text-muted-foreground">
-                      Amount cannot be changed after creation. Record a payment to reduce balance.
+                      Tutar sonradan değiştirilemez. Tahsilat/Ödeme ekleyerek kalanı düşürebilirsiniz.
                     </p>
                   )}
                   <FormMessage />
@@ -214,7 +218,7 @@ export function PayableFormSheet({
               name="due_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Due Date</FormLabel>
+                  <FormLabel>Vade Tarihi</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -229,9 +233,9 @@ export function PayableFormSheet({
               name="invoice_ref"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Invoice Reference</FormLabel>
+                  <FormLabel>Fatura / Referans No</FormLabel>
                   <FormControl>
-                    <Input placeholder="INV-2025-001" {...field} />
+                    <Input placeholder="FAT-2025-001" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -244,9 +248,9 @@ export function PayableFormSheet({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notlar</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional notes..." rows={2} {...field} />
+                    <Textarea placeholder="Ek notlar..." rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -255,11 +259,11 @@ export function PayableFormSheet({
 
             <div className="flex gap-2 pt-2 pb-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
+                İptal
               </Button>
               <Button type="submit" disabled={isPending} className="flex-1">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Save Changes' : 'Create'}
+                {isEditing ? 'Kaydet' : 'Oluştur'}
               </Button>
             </div>
           </form>

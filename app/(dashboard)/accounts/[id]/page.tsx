@@ -1,6 +1,7 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AccountDetailView } from '@/features/accounts/account-detail-view'
+import { getActiveCompany } from '@/lib/company'
 import type { Metadata } from 'next'
 
 interface AccountDetailPageProps {
@@ -13,20 +14,27 @@ export async function generateMetadata({ params }: AccountDetailPageProps): Prom
   const { data } = await supabase.from('accounts').select('name, company_name').eq('id', id).single()
   const account = data as { name: string; company_name: string | null } | null
   return {
-    title: account?.company_name ?? account?.name ?? 'Account Detail',
+    title: account?.company_name ?? account?.name ?? 'Cari Hesap Detayı',
   }
 }
 
 export default async function AccountDetailPage({ params }: AccountDetailPageProps) {
   const { id } = await params
+  const companyInfo = await getActiveCompany()
+
+  if (!companyInfo) {
+    redirect('/')
+  }
+
   const supabase = await createClient()
 
   const [{ data: account }, { data: transactions }, { data: payables }] = await Promise.all([
-    supabase.from('accounts').select('*').eq('id', id).single(),
+    supabase.from('accounts').select('*').eq('id', id).eq('company_id', companyInfo.id).single(),
     supabase
       .from('transactions')
       .select('*')
       .eq('account_id', id)
+      .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
       .order('transaction_date', { ascending: false })
       .limit(20),
@@ -34,6 +42,7 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
       .from('payables')
       .select('*')
       .eq('account_id', id)
+      .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
       .order('created_at', { ascending: false }),
   ])
@@ -45,6 +54,7 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
       account={account}
       transactions={transactions ?? []}
       payables={payables ?? []}
+      companyId={companyInfo.id}
     />
   )
 }

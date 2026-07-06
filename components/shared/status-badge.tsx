@@ -34,7 +34,7 @@ export function DirectionBadge({ direction }: { direction: 'incoming' | 'outgoin
         direction === 'incoming' ? 'status-positive' : 'status-negative'
       )}
     >
-      {direction === 'incoming' ? 'Incoming' : 'Outgoing'}
+      {direction === 'incoming' ? 'Gelen' : 'Giden'}
     </span>
   )
 }
@@ -42,9 +42,9 @@ export function DirectionBadge({ direction }: { direction: 'incoming' | 'outgoin
 // Account type badge
 export function AccountTypeBadge({ type }: { type: 'customer' | 'supplier' | 'both' }) {
   const config = {
-    customer: { label: 'Customer', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
-    supplier: { label: 'Supplier', className: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' },
-    both: { label: 'Customer & Supplier', className: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300' },
+    customer: { label: 'Müşteri', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' },
+    supplier: { label: 'Tedarikçi', className: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300' },
+    both: { label: 'Müşteri & Tedarikçi', className: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300' },
   }
   const c = config[type]
   return (

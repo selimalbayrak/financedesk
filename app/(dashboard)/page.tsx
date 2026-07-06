@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate, isDueSoon, isOverdue } from '@/lib/utils'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { getActiveCompany } from '@/lib/company'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -42,7 +43,7 @@ type TxRow = {
   account: { name: string } | null
 }
 
-async function getDashboardData() {
+async function getDashboardData(companyId: string) {
   const supabase = await createClient()
 
   const [
@@ -53,16 +54,19 @@ async function getDashboardData() {
     supabase
       .from('payables')
       .select('id, type, description, original_amount, remaining_amount, due_date, status, account:accounts(name, company_name)')
+      .eq('company_id', companyId)
       .is('deleted_at', null)
       .neq('status', 'cancelled')
       .neq('status', 'paid'),
     supabase
       .from('loans')
       .select('id, remaining_balance')
+      .eq('company_id', companyId)
       .eq('status', 'active'),
     supabase
       .from('transactions')
       .select('id, type, amount, description, category, transaction_date, account:accounts(name)')
+      .eq('company_id', companyId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(8),
@@ -96,43 +100,53 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
-  const data = await getDashboardData()
+  const companyInfo = await getActiveCompany()
+  
+  if (!companyInfo) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center text-muted-foreground">
+        Şirket hesabı bulunamadı. Lütfen giriş yaptığınızdan emin olun.
+      </div>
+    )
+  }
+
+  const data = await getDashboardData(companyInfo.id)
 
   return (
     <div className="space-y-6 animate-in-up">
       <PageHeader
-        title="Dashboard"
-        description="Your financial overview at a glance"
+        title="Ana Ekran"
+        description="Finansal durumunuza genel bir bakış"
       />
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Receivables"
+          title="Toplam Alacak"
           value={data.totalReceivable}
           icon={ArrowDownCircle}
-          description="Outstanding from customers"
+          description="Müşterilerden beklenen"
           trend="positive"
         />
         <StatCard
-          title="Total Payables"
+          title="Toplam Borç"
           value={data.totalPayable}
           icon={ArrowUpCircle}
-          description="Owed to suppliers"
+          description="Tedarikçilere ödenecek"
           trend="negative"
         />
         <StatCard
-          title="Outstanding Loans"
+          title="Kredi Borçları"
           value={data.totalLoanBalance}
           icon={Landmark}
-          description="Bank loan balances"
+          description="Kalan kredi anaparaları"
           trend="negative"
         />
         <StatCard
-          title="Due This Week"
+          title="Bu Hafta Ödenecekler"
           value={data.upcoming.reduce((s, p) => s + p.remaining_amount, 0)}
           icon={CalendarClock}
-          description={`${data.upcoming.length} upcoming payment${data.upcoming.length !== 1 ? 's' : ''}`}
+          description={`Yaklaşan ${data.upcoming.length} işlem`}
           trend={data.upcoming.length > 0 ? 'negative' : 'neutral'}
         />
       </div>
@@ -141,12 +155,12 @@ export default async function DashboardPage() {
         {/* Upcoming Payments */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Upcoming &amp; Overdue</CardTitle>
+            <CardTitle className="text-sm font-semibold">Yaklaşan & Vadesi Geçenler</CardTitle>
           </CardHeader>
           <CardContent>
             {data.upcoming.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
-                🎉 No upcoming payments this week
+                🎉 Bu hafta bekleyen ödeme veya tahsilat yok
               </p>
             ) : (
               <div className="space-y-2">
@@ -157,7 +171,7 @@ export default async function DashboardPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">
-                        {item.account?.company_name || item.account?.name || 'Unknown'}
+                        {item.account?.company_name || item.account?.name || 'Bilinmiyor'}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">{item.description}</p>
                     </div>
@@ -184,12 +198,12 @@ export default async function DashboardPage() {
         {/* Recent Transactions */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Recent Transactions</CardTitle>
+            <CardTitle className="text-sm font-semibold">Son İşlemler</CardTitle>
           </CardHeader>
           <CardContent>
             {data.recentTransactions.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
-                No transactions yet
+                Henüz işlem bulunmuyor
               </p>
             ) : (
               <div className="space-y-2">

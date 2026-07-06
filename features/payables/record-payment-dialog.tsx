@@ -33,9 +33,10 @@ interface RecordPaymentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   payable: PayableWithAccount
+  companyId: string
 }
 
-export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPaymentDialogProps) {
+export function RecordPaymentDialog({ open, onOpenChange, payable, companyId }: RecordPaymentDialogProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -67,30 +68,34 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
     startTransition(async () => {
       await Promise.all([
         supabase.from('payable_payments').insert({
+          company_id: companyId,
           payable_id: payable.id,
           amount: paymentKurus,
           payment_date: values.payment_date,
           notes: values.notes || null,
-        }),
+        } as any),
         supabase
           .from('payables')
           .update({
             remaining_amount: newRemaining,
             status: newStatus,
             updated_at: new Date().toISOString(),
-          })
-          .eq('id', payable.id),
+          } as any)
+          .eq('id', payable.id)
+          .eq('company_id', companyId),
       ])
       onOpenChange(false)
       router.refresh()
     })
   }
 
+  const isReceivable = payable.type === 'receivable'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
+          <DialogTitle>{isReceivable ? 'Tahsilat Ekle' : 'Ödeme Yap'}</DialogTitle>
           <DialogDescription>
             {payable.account.company_name || payable.account.name} — {payable.description}
           </DialogDescription>
@@ -99,8 +104,8 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
         {/* Payment progress */}
         <div className="space-y-1.5 pb-2">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Paid: {formatCurrency(toKurus(paidAmount))}</span>
-            <span>Remaining: {formatCurrency(payable.remaining_amount)}</span>
+            <span>Ödenen: {formatCurrency(toKurus(paidAmount))}</span>
+            <span>Kalan: {formatCurrency(payable.remaining_amount)}</span>
           </div>
           <Progress value={percentPaid} className="h-1.5" />
         </div>
@@ -112,7 +117,7 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payment Amount (₺)</FormLabel>
+                  <FormLabel>Tutar (₺)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -133,7 +138,7 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
               name="payment_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payment Date</FormLabel>
+                  <FormLabel>Tarih</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
@@ -147,9 +152,9 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notlar</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="e.g. Bank transfer ref #..." rows={2} {...field} />
+                    <Textarea placeholder="Örn: Havale dekont no..." rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -158,11 +163,11 @@ export function RecordPaymentDialog({ open, onOpenChange, payable }: RecordPayme
 
             <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
+                İptal
               </Button>
               <Button type="submit" disabled={isPending} className="flex-1">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Record Payment
+                Kaydet
               </Button>
             </div>
           </form>

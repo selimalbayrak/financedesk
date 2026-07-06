@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ColumnDef } from '@tanstack/react-table'
 import { MoreHorizontal, Plus, ArrowUpDown, Pencil, Trash2, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -38,9 +39,10 @@ import type { Account } from '@/types/database.types'
 
 interface AccountsTableProps {
   accounts: Account[]
+  companyId: string
 }
 
-export function AccountsTable({ accounts }: AccountsTableProps) {
+export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
   const router = useRouter()
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [formOpen, setFormOpen] = useState(false)
@@ -58,8 +60,9 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
     startDelete(async () => {
       await supabase
         .from('accounts')
-        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .update({ deleted_at: new Date().toISOString(), is_active: false } as any)
         .eq('id', deleteAccount.id)
+        .eq('company_id', companyId)
       setDeleteAccount(null)
       router.refresh()
     })
@@ -75,18 +78,18 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
           className="-ml-3 h-8 font-semibold"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
-          Name
+          Cari Adı / Ünvan
           <ArrowUpDown className="ml-1 h-3 w-3" />
         </Button>
       ),
       cell: ({ row }) => (
         <div>
-          <a
+          <Link
             href={`/accounts/${row.original.id}`}
             className="font-medium hover:text-primary transition-colors"
           >
             {row.original.company_name || row.original.name}
-          </a>
+          </Link>
           {row.original.company_name && (
             <p className="text-xs text-muted-foreground">{row.original.name}</p>
           )}
@@ -95,26 +98,26 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
     },
     {
       accessorKey: 'type',
-      header: 'Type',
+      header: 'Hesap Tipi',
       cell: ({ row }) => <AccountTypeBadge type={row.original.type} />,
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
+      header: 'Telefon',
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm">{row.original.phone ?? '—'}</span>
       ),
     },
     {
       accessorKey: 'city',
-      header: 'City',
+      header: 'Şehir',
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm">{row.original.city ?? '—'}</span>
       ),
     },
     {
       accessorKey: 'tax_number',
-      header: 'Tax No.',
+      header: 'Vergi / TC No',
       cell: ({ row }) => (
         <span className="text-muted-foreground text-sm font-mono text-xs">
           {row.original.tax_number ?? '—'}
@@ -135,14 +138,14 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
           />
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem
-              render={<a href={`/accounts/${row.original.id}`} className="flex items-center gap-2 w-full" />}
+              render={<Link href={`/accounts/${row.original.id}`} className="flex items-center gap-2 w-full" />}
             >
               <Eye className="h-4 w-4" />
-              View
+              Görüntüle
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { setEditAccount(row.original); setFormOpen(true) }}>
               <Pencil className="mr-2 h-4 w-4" />
-              Edit
+              Düzenle
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -150,7 +153,7 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
               onClick={() => setDeleteAccount(row.original)}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+              Sil
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -161,8 +164,8 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
   return (
     <>
       <PageHeader
-        title="Current Accounts"
-        description="Manage your customers and suppliers"
+        title="Cari Hesaplar"
+        description="Müşteri ve tedarikçilerinizi yönetin"
         actions={
           <Button
             size="sm"
@@ -170,7 +173,7 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
             id="new-account-btn"
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            New Account
+            Yeni Cari Ekle
           </Button>
         }
       />
@@ -178,9 +181,9 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
       {accounts.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="No accounts yet"
-          description="Add your first customer or supplier to get started."
-          actionLabel="New Account"
+          title="Henüz cari hesap yok"
+          description="Başlamak için ilk müşterinizi veya tedarikçinizi ekleyin."
+          actionLabel="Yeni Cari Ekle"
           onAction={() => { setEditAccount(null); setFormOpen(true) }}
         />
       ) : (
@@ -188,21 +191,21 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
           columns={columns}
           data={filtered}
           searchKey="name"
-          searchPlaceholder="Search accounts..."
+          searchPlaceholder="Cari hesaplarda ara..."
           toolbar={
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
               <SelectTrigger className="h-9 w-36">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="customer">Customers</SelectItem>
-                <SelectItem value="supplier">Suppliers</SelectItem>
-                <SelectItem value="both">Both</SelectItem>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="customer">Müşteriler</SelectItem>
+                <SelectItem value="supplier">Tedarikçiler</SelectItem>
+                <SelectItem value="both">İkisi de</SelectItem>
               </SelectContent>
             </Select>
           }
-          emptyMessage="No accounts match your search."
+          emptyMessage="Aramanıza uygun cari hesap bulunamadı."
         />
       )}
 
@@ -214,26 +217,26 @@ export function AccountsTable({ accounts }: AccountsTableProps) {
           if (!open) setEditAccount(null)
         }}
         account={editAccount}
+        companyId={companyId}
       />
 
       {/* Delete Confirmation */}
       <Dialog open={!!deleteAccount} onOpenChange={(open) => !open && setDeleteAccount(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Account</DialogTitle>
+            <DialogTitle>Cari Hesabı Sil</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{' '}
-              <strong>{deleteAccount?.company_name || deleteAccount?.name}</strong>?
-              This action cannot be undone.
+              <strong>{deleteAccount?.company_name || deleteAccount?.name}</strong> adlı cariyi silmek istediğinize emin misiniz?
+              Bu işlem geri alınamaz.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteAccount(null)}>
-              Cancel
+              İptal
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Sil
             </Button>
           </DialogFooter>
         </DialogContent>

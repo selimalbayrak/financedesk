@@ -80,11 +80,11 @@ export function computePayableStatus(
 }
 
 export const payableStatusConfig: Record<PayableStatus, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'status-neutral' },
-  partial: { label: 'Partial', className: 'status-warning' },
-  paid: { label: 'Paid', className: 'status-positive' },
-  overdue: { label: 'Overdue', className: 'status-negative' },
-  cancelled: { label: 'Cancelled', className: 'status-neutral' },
+  pending: { label: 'Bekliyor', className: 'status-neutral' },
+  partial: { label: 'Kısmi', className: 'status-warning' },
+  paid: { label: 'Ödendi', className: 'status-positive' },
+  overdue: { label: 'Gecikti', className: 'status-negative' },
+  cancelled: { label: 'İptal', className: 'status-neutral' },
 }
 
 // ─── Numbers ─────────────────────────────────────────────────────────────────

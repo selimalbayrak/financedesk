@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-
+import Link from 'next/link'
 import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,9 +16,10 @@ interface AccountDetailViewProps {
   account: Account
   transactions: Transaction[]
   payables: Payable[]
+  companyId: string
 }
 
-export function AccountDetailView({ account, transactions, payables }: AccountDetailViewProps) {
+export function AccountDetailView({ account, transactions, payables, companyId }: AccountDetailViewProps) {
   const [editOpen, setEditOpen] = useState(false)
 
   const totalReceivable = payables
@@ -39,10 +40,10 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
           variant="ghost"
           size="sm"
           className="-ml-2 gap-1.5"
-          render={<a href="/accounts" />}
+          render={<Link href="/accounts" />}
         >
           <ChevronLeft className="h-4 w-4" />
-          Current Accounts
+          Cari Hesaplar
         </Button>
       </div>
 
@@ -61,7 +62,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
         </div>
         <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
           <Pencil className="mr-1.5 h-4 w-4" />
-          Edit
+          Düzenle
         </Button>
       </div>
 
@@ -69,7 +70,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
       <div className="grid gap-3 sm:grid-cols-3 mb-6">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Receivable</p>
+            <p className="text-xs text-muted-foreground font-medium">Alacak</p>
             <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
               {formatCurrency(totalReceivable)}
             </p>
@@ -77,7 +78,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Payable</p>
+            <p className="text-xs text-muted-foreground font-medium">Borç</p>
             <p className="text-lg font-bold text-rose-600 dark:text-rose-400 tabular-nums mt-0.5">
               {formatCurrency(totalPayable)}
             </p>
@@ -85,7 +86,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Net Balance</p>
+            <p className="text-xs text-muted-foreground font-medium">Net Bakiye</p>
             <p className={`text-lg font-bold tabular-nums mt-0.5 ${
               netBalance >= 0
                 ? 'text-emerald-600 dark:text-emerald-400'
@@ -100,12 +101,12 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
       {/* Tabs */}
       <Tabs defaultValue="info">
         <TabsList>
-          <TabsTrigger value="info">Info</TabsTrigger>
+          <TabsTrigger value="info">Bilgiler</TabsTrigger>
           <TabsTrigger value="payables">
-            Payables & Receivables ({payables.length})
+            Borç/Alacak ({payables.length})
           </TabsTrigger>
           <TabsTrigger value="transactions">
-            Transactions ({transactions.length})
+            İşlemler ({transactions.length})
           </TabsTrigger>
         </TabsList>
 
@@ -114,32 +115,32 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
           <Card>
             <CardContent className="p-5 grid sm:grid-cols-2 gap-x-8 gap-y-4">
               {account.email && (
-                <InfoRow icon={Mail} label="Email" value={account.email} />
+                <InfoRow icon={Mail} label="E-Posta" value={account.email} />
               )}
               {account.phone && (
-                <InfoRow icon={Phone} label="Phone" value={account.phone} />
+                <InfoRow icon={Phone} label="Telefon" value={account.phone} />
               )}
               {account.city && (
-                <InfoRow icon={MapPin} label="City" value={account.city} />
+                <InfoRow icon={MapPin} label="Şehir" value={account.city} />
               )}
               {account.company_name && (
-                <InfoRow icon={Building2} label="Company" value={account.company_name} />
+                <InfoRow icon={Building2} label="Ünvan" value={account.company_name} />
               )}
               {account.tax_number && (
-                <InfoRow icon={Hash} label="Tax Number" value={account.tax_number} />
+                <InfoRow icon={Hash} label="Vergi No" value={account.tax_number} />
               )}
               {account.tax_office && (
-                <InfoRow icon={Hash} label="Tax Office" value={account.tax_office} />
+                <InfoRow icon={Hash} label="Vergi Dairesi" value={account.tax_office} />
               )}
               {account.address && (
                 <div className="sm:col-span-2">
-                  <InfoRow icon={MapPin} label="Address" value={account.address} />
+                  <InfoRow icon={MapPin} label="Adres" value={account.address} />
                 </div>
               )}
               {account.notes && (
                 <div className="sm:col-span-2">
                   <Separator className="mb-4" />
-                  <p className="text-xs text-muted-foreground font-medium uppercase mb-1">Notes</p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase mb-1">Notlar</p>
                   <p className="text-sm whitespace-pre-wrap">{account.notes}</p>
                 </div>
               )}
@@ -153,7 +154,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
             <CardContent className="p-0">
               {payables.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-10">
-                  No payables or receivables for this account.
+                  Bu cariye ait kayıt bulunmuyor.
                 </p>
               ) : (
                 <div className="divide-y">
@@ -163,7 +164,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
                         <p className="text-sm font-medium truncate">{p.description}</p>
                         <p className="text-xs text-muted-foreground">
                           {p.invoice_ref && `Ref: ${p.invoice_ref} · `}
-                          Due: {p.due_date ? formatDateShort(p.due_date) : '—'}
+                          Vade: {p.due_date ? formatDateShort(p.due_date) : '—'}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -176,7 +177,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
                             {formatCurrency(p.remaining_amount)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            of {formatCurrency(p.original_amount)}
+                            {formatCurrency(p.original_amount)} üzerinden
                           </p>
                         </div>
                         <StatusBadge status={p.status} />
@@ -195,7 +196,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
             <CardContent className="p-0">
               {transactions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-10">
-                  No transactions for this account.
+                  Bu cariye ait işlem bulunmuyor.
                 </p>
               ) : (
                 <div className="divide-y">
@@ -230,6 +231,7 @@ export function AccountDetailView({ account, transactions, payables }: AccountDe
         open={editOpen}
         onOpenChange={setEditOpen}
         account={account}
+        companyId={companyId}
       />
     </>
   )

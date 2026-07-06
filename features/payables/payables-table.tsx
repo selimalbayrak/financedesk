@@ -42,9 +42,10 @@ import type { Account, PayableWithAccount } from '@/types/database.types'
 interface PayablesTableProps {
   payables: PayableWithAccount[]
   accounts: Pick<Account, 'id' | 'name' | 'company_name'>[]
+  companyId: string
 }
 
-export function PayablesTable({ payables, accounts }: PayablesTableProps) {
+export function PayablesTable({ payables, accounts, companyId }: PayablesTableProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'payable' | 'receivable'>('payable')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -64,8 +65,9 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
     startDelete(async () => {
       await supabase
         .from('payables')
-        .update({ deleted_at: new Date().toISOString(), status: 'cancelled' })
+        .update({ deleted_at: new Date().toISOString(), status: 'cancelled' } as any)
         .eq('id', deletePayable.id)
+        .eq('company_id', companyId)
       setDeletePayable(null)
       router.refresh()
     })
@@ -83,7 +85,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
   const columns: ColumnDef<PayableWithAccount>[] = [
     {
       accessorKey: 'account',
-      header: 'Account',
+      header: 'Cari',
       cell: ({ row }) => (
         <div>
           <p className="font-medium text-sm">
@@ -94,7 +96,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
     },
     {
       accessorKey: 'description',
-      header: 'Description',
+      header: 'Açıklama',
       cell: ({ row }) => (
         <div className="max-w-xs">
           <p className="text-sm truncate">{row.original.description}</p>
@@ -113,7 +115,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
           className="-ml-3 h-8 font-semibold"
           onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
         >
-          Due Date
+          Vade Tarihi
           <ArrowUpDown className="ml-1 h-3 w-3" />
         </Button>
       ),
@@ -130,7 +132,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
     },
     {
       accessorKey: 'remaining_amount',
-      header: 'Remaining',
+      header: 'Kalan Tutar',
       cell: ({ row }) => (
         <div>
           <p className={`text-sm font-semibold tabular-nums ${
@@ -141,14 +143,14 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
             {formatCurrency(row.original.remaining_amount)}
           </p>
           <p className="text-xs text-muted-foreground">
-            of {formatCurrency(row.original.original_amount)}
+            {formatCurrency(row.original.original_amount)} üzerinden
           </p>
         </div>
       ),
     },
     {
       accessorKey: 'status',
-      header: 'Status',
+      header: 'Durum',
       cell: ({ row }) => <StatusBadge status={row.original.status} />,
     },
     {
@@ -166,16 +168,16 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
                 </button>
               }
             />
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-48">
               {canPay && (
                 <DropdownMenuItem onClick={() => setPaymentPayable(p)}>
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Record Payment
+                  {p.type === 'payable' ? 'Ödeme Yap' : 'Tahsilat Ekle'}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={() => { setEditPayable(p); setFormOpen(true) }}>
                 <Pencil className="mr-2 h-4 w-4" />
-                Edit
+                Düzenle
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -183,7 +185,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
                 onClick={() => setDeletePayable(p)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+                Sil (İptal)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -195,8 +197,8 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
   return (
     <>
       <PageHeader
-        title="Payables & Receivables"
-        description="Track what you owe and what you're owed"
+        title="Borç & Alacak Takibi"
+        description="Ödemelerinizi ve tahsilatlarınızı yönetin"
         actions={
           <Button
             size="sm"
@@ -204,7 +206,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
             id="new-payable-btn"
           >
             <Plus className="mr-1.5 h-4 w-4" />
-            New Entry
+            Yeni Kayıt
           </Button>
         }
       />
@@ -212,13 +214,13 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
       {/* Summary row */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="rounded-xl border bg-rose-50 dark:bg-rose-950/30 p-4">
-          <p className="text-xs text-muted-foreground font-medium">Total Payable (Outstanding)</p>
+          <p className="text-xs text-muted-foreground font-medium">Toplam Ödenecek (Borç)</p>
           <p className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums mt-0.5">
             {formatCurrency(totalByType.payable)}
           </p>
         </div>
         <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/30 p-4">
-          <p className="text-xs text-muted-foreground font-medium">Total Receivable (Outstanding)</p>
+          <p className="text-xs text-muted-foreground font-medium">Toplam Tahsil Edilecek (Alacak)</p>
           <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
             {formatCurrency(totalByType.receivable)}
           </p>
@@ -229,10 +231,10 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
         <div className="flex items-center justify-between gap-3 mb-3">
           <TabsList>
             <TabsTrigger value="payable">
-              Payables ({payables.filter(p => p.type === 'payable').length})
+              Borçlar ({payables.filter(p => p.type === 'payable').length})
             </TabsTrigger>
             <TabsTrigger value="receivable">
-              Receivables ({payables.filter(p => p.type === 'receivable').length})
+              Alacaklar ({payables.filter(p => p.type === 'receivable').length})
             </TabsTrigger>
           </TabsList>
 
@@ -241,11 +243,11 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="all">Tüm Durumlar</SelectItem>
+              <SelectItem value="pending">Bekliyor</SelectItem>
+              <SelectItem value="partial">Kısmi Ödendi</SelectItem>
+              <SelectItem value="overdue">Gecikmiş</SelectItem>
+              <SelectItem value="paid">Ödendi</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -254,9 +256,9 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
           {filtered.length === 0 ? (
             <EmptyState
               icon={ArrowDownCircle}
-              title="No payables"
-              description="Track amounts you owe to suppliers."
-              actionLabel="New Payable"
+              title="Borç kaydı yok"
+              description="Tedarikçilere olan borçlarınızı buradan takip edebilirsiniz."
+              actionLabel="Yeni Borç Ekle"
               onAction={() => { setEditPayable(null); setFormOpen(true) }}
             />
           ) : (
@@ -264,8 +266,8 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
               columns={columns}
               data={filtered}
               searchKey="description"
-              searchPlaceholder="Search payables..."
-              emptyMessage="No payables match your filters."
+              searchPlaceholder="Açıklamaya göre ara..."
+              emptyMessage="Aramanıza uygun borç kaydı bulunamadı."
             />
           )}
         </TabsContent>
@@ -274,9 +276,9 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
           {filtered.length === 0 ? (
             <EmptyState
               icon={ArrowDownCircle}
-              title="No receivables"
-              description="Track amounts customers owe you."
-              actionLabel="New Receivable"
+              title="Alacak kaydı yok"
+              description="Müşterilerden beklediğiniz ödemeleri buradan takip edebilirsiniz."
+              actionLabel="Yeni Alacak Ekle"
               onAction={() => { setEditPayable(null); setFormOpen(true) }}
             />
           ) : (
@@ -284,8 +286,8 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
               columns={columns}
               data={filtered}
               searchKey="description"
-              searchPlaceholder="Search receivables..."
-              emptyMessage="No receivables match your filters."
+              searchPlaceholder="Açıklamaya göre ara..."
+              emptyMessage="Aramanıza uygun alacak kaydı bulunamadı."
             />
           )}
         </TabsContent>
@@ -301,6 +303,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
         accounts={accounts}
         payable={editPayable}
         defaultType={activeTab}
+        companyId={companyId}
       />
 
       {/* Record Payment */}
@@ -309,6 +312,7 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
           open={!!paymentPayable}
           onOpenChange={(open) => !open && setPaymentPayable(null)}
           payable={paymentPayable}
+          companyId={companyId}
         />
       )}
 
@@ -316,18 +320,18 @@ export function PayablesTable({ payables, accounts }: PayablesTableProps) {
       <Dialog open={!!deletePayable} onOpenChange={(open) => !open && setDeletePayable(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Entry</DialogTitle>
+            <DialogTitle>Kaydı İptal Et</DialogTitle>
             <DialogDescription>
-              Delete <strong>{deletePayable?.description}</strong>? This cannot be undone.
+              <strong>{deletePayable?.description}</strong> silinecektir. Bu işlem geri alınamaz.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeletePayable(null)}>
-              Cancel
+              Vazgeç
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Sil
             </Button>
           </DialogFooter>
         </DialogContent>

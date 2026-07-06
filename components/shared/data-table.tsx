@@ -41,10 +41,10 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder = 'Ara...',
   pageSize = 15,
   isLoading = false,
-  emptyMessage = 'No records found.',
+  emptyMessage = 'Kayıt bulunamadı.',
   toolbar,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
@@ -139,7 +139,7 @@ export function DataTable<TData, TValue>({
       {table.getPageCount() > 1 && (
         <div className="flex items-center justify-between text-sm">
           <p className="text-muted-foreground">
-            {table.getFilteredRowModel().rows.length} record{table.getFilteredRowModel().rows.length !== 1 ? 's' : ''}
+            {table.getFilteredRowModel().rows.length} kayıt
           </p>
           <div className="flex items-center gap-2">
             <Button

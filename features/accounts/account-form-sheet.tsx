@@ -39,9 +39,10 @@ interface AccountFormSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   account?: Account | null
+  companyId: string
 }
 
-export function AccountFormSheet({ open, onOpenChange, account }: AccountFormSheetProps) {
+export function AccountFormSheet({ open, onOpenChange, account, companyId }: AccountFormSheetProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const isEditing = !!account
@@ -76,9 +77,10 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
           .from('accounts')
           .update({ ...cleanValues, updated_at: new Date().toISOString() })
           .eq('id', account.id)
+          .eq('company_id', companyId)
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (db as any).from('accounts').insert(cleanValues)
+        await (db as any).from('accounts').insert({ ...cleanValues, company_id: companyId })
       }
       onOpenChange(false)
       router.refresh()
@@ -89,9 +91,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{isEditing ? 'Edit Account' : 'New Account'}</SheetTitle>
+          <SheetTitle>{isEditing ? 'Cari Düzenle' : 'Yeni Cari Hesap'}</SheetTitle>
           <SheetDescription>
-            {isEditing ? 'Update account details.' : 'Add a new customer or supplier account.'}
+            {isEditing ? 'Cari hesap bilgilerini güncelleyin.' : 'Yeni bir müşteri veya tedarikçi hesabı oluşturun.'}
           </SheetDescription>
         </SheetHeader>
 
@@ -103,17 +105,17 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
               name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Account Type *</FormLabel>
+                  <FormLabel>Hesap Tipi *</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
+                        <SelectValue placeholder="Tip seçin" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="supplier">Supplier</SelectItem>
-                      <SelectItem value="both">Both</SelectItem>
+                      <SelectItem value="customer">Müşteri</SelectItem>
+                      <SelectItem value="supplier">Tedarikçi</SelectItem>
+                      <SelectItem value="both">İkisi de</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -127,9 +129,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Full Name *</FormLabel>
+                  <FormLabel>Yetkili / Ad Soyad *</FormLabel>
                   <FormControl>
-                    <Input placeholder="John Doe" {...field} />
+                    <Input placeholder="Ahmet Yılmaz" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -142,9 +144,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
               name="company_name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Company Name</FormLabel>
+                  <FormLabel>Firma Ünvanı</FormLabel>
                   <FormControl>
-                    <Input placeholder="Acme Ltd." {...field} />
+                    <Input placeholder="Örnek Ltd. Şti." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -152,7 +154,7 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
             />
 
             <Separator />
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tax Information</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Vergi Bilgileri</p>
 
             <div className="grid grid-cols-2 gap-3">
               <FormField
@@ -160,7 +162,7 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
                 name="tax_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tax Number</FormLabel>
+                     <FormLabel>Vergi / TC Kimlik No</FormLabel>
                     <FormControl>
                       <Input placeholder="1234567890" {...field} />
                     </FormControl>
@@ -173,7 +175,7 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
                 name="tax_office"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tax Office</FormLabel>
+                    <FormLabel>Vergi Dairesi</FormLabel>
                     <FormControl>
                       <Input placeholder="Kadıköy VD" {...field} />
                     </FormControl>
@@ -184,7 +186,7 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
             </div>
 
             <Separator />
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contact</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">İletişim</p>
 
             <div className="grid grid-cols-2 gap-3">
               <FormField
@@ -192,9 +194,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>E-Posta</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="john@example.com" {...field} />
+                      <Input type="email" placeholder="ornek@firma.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -205,9 +207,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>Telefon</FormLabel>
                     <FormControl>
-                      <Input placeholder="+90 555 000 0000" {...field} />
+                      <Input placeholder="0555 000 0000" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -221,9 +223,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
                 name="city"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>City</FormLabel>
+                    <FormLabel>Şehir</FormLabel>
                     <FormControl>
-                      <Input placeholder="Istanbul" {...field} />
+                      <Input placeholder="İstanbul" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -236,9 +238,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>Adres</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Full address..." rows={2} {...field} />
+                    <Textarea placeholder="Açık adres..." rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -250,9 +252,9 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>Notlar</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Additional notes..." rows={3} {...field} />
+                    <Textarea placeholder="Cari ile ilgili ek notlar..." rows={3} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -261,11 +263,11 @@ export function AccountFormSheet({ open, onOpenChange, account }: AccountFormShe
 
             <div className="flex gap-2 pt-2 pb-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
-                Cancel
+                İptal
               </Button>
               <Button type="submit" disabled={isPending} className="flex-1">
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditing ? 'Save Changes' : 'Create Account'}
+                {isEditing ? 'Kaydet' : 'Oluştur'}
               </Button>
             </div>
           </form>
