@@ -25,15 +25,15 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
   // Since transactions are ordered ascending, we iterate from start to end
   let currentBalance = 0
   const ledgerData = transactions.map(tx => {
-    // Debit increases balance (customer owes us more)
-    // Credit decreases balance (customer paid us)
-    if (tx.type === 'debit') {
+    const isPositive = tx.transaction_type === 'invoice_out' || tx.transaction_type === 'payment_out'
+    if (isPositive) {
       currentBalance += tx.amount
     } else {
       currentBalance -= tx.amount
     }
     return {
       ...tx,
+      isPositive,
       runningBalance: currentBalance
     }
   })
@@ -43,25 +43,28 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
 
   return (
     <div className="space-y-4">
+      {/* PDF özelliğini şimdilik gizliyoruz */}
+      {/* 
       <div className="flex justify-end">
         <Button onClick={() => setUploadOpen(true)} size="sm" className="gap-2">
           <FileUp className="h-4 w-4" />
           PDF'ten Aktar
         </Button>
-      </div>
+      </div> 
+      */}
 
-      <Card>
+      <Card className="border-border/50 shadow-sm">
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/40 text-muted-foreground text-xs uppercase font-semibold">
               <tr>
                 <th className="px-4 py-3 font-medium"></th>
                 <th className="px-4 py-3 font-medium">Tarih</th>
-                <th className="px-4 py-3 font-medium">Fiş Türü / Belge No</th>
+                <th className="px-4 py-3 font-medium">İşlem Türü / Belge</th>
                 <th className="px-4 py-3 font-medium">Açıklama</th>
-                <th className="px-4 py-3 font-medium text-right">Borç</th>
-                <th className="px-4 py-3 font-medium text-right">Alacak</th>
-                <th className="px-4 py-3 font-medium text-right">Bakiye</th>
+                <th className="px-4 py-3 font-medium text-right text-emerald-600 dark:text-emerald-400">Bizim Alacağımız (+)</th>
+                <th className="px-4 py-3 font-medium text-right text-rose-600 dark:text-rose-400">Bizim Borcumuz (-)</th>
+                <th className="px-4 py-3 font-medium text-right">Kalan Bakiye</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -75,6 +78,12 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                 displayData.map((tx) => {
                   const hasLines = tx.transaction_lines && tx.transaction_lines.length > 0
                   const isExpanded = expandedRows[tx.id]
+                  
+                  const typeLabel = 
+                    tx.transaction_type === 'payment_in' ? 'Alınan Ödeme' :
+                    tx.transaction_type === 'payment_out' ? 'Gönderilen Ödeme' :
+                    tx.transaction_type === 'invoice_in' ? 'Alınan Ürün/Hizmet' :
+                    'Verilen Ürün/Hizmet'
 
                   return (
                     <React.Fragment key={tx.id}>
@@ -91,20 +100,20 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">{formatDateShort(tx.transaction_date)}</td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{tx.document_type || '—'}</div>
-                          <div className="text-xs text-muted-foreground">{tx.document_no || tx.reference_no}</div>
+                          <div className="font-medium text-foreground">{typeLabel}</div>
+                          <div className="text-xs text-muted-foreground">{tx.document_no || tx.reference_no || '—'}</div>
                         </td>
-                        <td className="px-4 py-3">{tx.description || tx.category}</td>
+                        <td className="px-4 py-3">{tx.description || tx.category || '—'}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
-                          {tx.type === 'debit' ? formatCurrency(tx.amount) : ''}
+                          {tx.isPositive ? formatCurrency(tx.amount) : ''}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-rose-600 dark:text-rose-400 font-medium">
-                          {tx.type === 'credit' ? formatCurrency(tx.amount) : ''}
+                          {!tx.isPositive ? formatCurrency(tx.amount) : ''}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                          {formatCurrency(tx.runningBalance)}
-                          <span className="text-[10px] ml-1 text-muted-foreground">
-                            {tx.runningBalance >= 0 ? '(B)' : '(A)'}
+                          {formatCurrency(Math.abs(tx.runningBalance))}
+                          <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded-sm ${tx.runningBalance >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30'}`}>
+                            {tx.runningBalance >= 0 ? 'Alacak' : 'Borç'}
                           </span>
                         </td>
                       </tr>

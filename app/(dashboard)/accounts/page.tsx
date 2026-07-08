@@ -20,12 +20,17 @@ export default async function AccountsPage() {
 
   const supabase = await createClient()
 
-  const { data: accounts } = await supabase
+  const { data: accountsRaw } = await supabase
     .from('accounts')
-    .select('*')
+    .select('*, account_balances(balance)')
     .eq('company_id', companyInfo.id)
     .is('deleted_at', null)
     .order('name', { ascending: true })
 
-  return <AccountsTable accounts={accounts ?? []} companyId={companyInfo.id} />
+  const accounts = (accountsRaw ?? []).map(acc => ({
+    ...acc,
+    balance: (acc.account_balances as any)?.[0]?.balance ?? 0
+  }))
+
+  return <AccountsTable accounts={accounts as any} companyId={companyInfo.id} />
 }

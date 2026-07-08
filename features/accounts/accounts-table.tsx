@@ -102,18 +102,30 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
       cell: ({ row }) => <AccountTypeBadge type={row.original.type} />,
     },
     {
-      accessorKey: 'phone',
-      header: 'Telefon',
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">{row.original.phone ?? '—'}</span>
-      ),
-    },
-    {
-      accessorKey: 'city',
-      header: 'Şehir',
-      cell: ({ row }) => (
-        <span className="text-muted-foreground text-sm">{row.original.city ?? '—'}</span>
-      ),
+      accessorKey: 'balance',
+      header: 'Bakiye Durumu',
+      cell: ({ row }) => {
+        const bal = (row.original as any).balance || 0
+        if (bal === 0) return <span className="text-muted-foreground text-sm">Bakiyesiz</span>
+        if (bal > 0) {
+          return (
+            <div className="flex flex-col">
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums text-sm">
+                +{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(bal)}
+              </span>
+              <span className="text-[10px] text-emerald-600/70 font-medium">Alacağımız</span>
+            </div>
+          )
+        }
+        return (
+          <div className="flex flex-col">
+            <span className="text-rose-600 dark:text-rose-400 font-semibold tabular-nums text-sm">
+              -{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Math.abs(bal))}
+            </span>
+            <span className="text-[10px] text-rose-600/70 font-medium">Borcumuz</span>
+          </div>
+        )
+      }
     },
     {
       accessorKey: 'tax_number',

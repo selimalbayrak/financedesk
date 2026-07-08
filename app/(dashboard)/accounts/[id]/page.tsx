@@ -28,7 +28,7 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
 
   const supabase = await createClient()
 
-  const [{ data: account }, { data: transactions }, { data: payables }] = await Promise.all([
+  const [{ data: account }, { data: transactions }] = await Promise.all([
     supabase.from('accounts').select('*').eq('id', id).eq('company_id', companyInfo.id).single(),
     supabase
       .from('transactions')
@@ -38,13 +38,6 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
       .is('deleted_at', null)
       .order('transaction_date', { ascending: true })
       .order('created_at', { ascending: true }),
-    supabase
-      .from('payables')
-      .select('*')
-      .eq('account_id', id)
-      .eq('company_id', companyInfo.id)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false }),
   ])
 
   if (!account) notFound()
@@ -53,7 +46,6 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
     <AccountDetailView
       account={account}
       transactions={transactions ?? []}
-      payables={payables ?? []}
       companyId={companyInfo.id}
     />
   )

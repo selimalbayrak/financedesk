@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Quicksand } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from 'sonner'
 import './globals.css'
 
 const quicksand = Quicksand({
@@ -35,6 +36,7 @@ export default function RootLayout({
         >
           <TooltipProvider>
             {children}
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       </body>

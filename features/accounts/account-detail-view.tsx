@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash } from 'lucide-react'
+import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, Activity } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,27 +11,28 @@ import { AccountFormSheet } from './account-form-sheet'
 import { AccountLedger } from './ledger/account-ledger'
 import { AccountTypeBadge, StatusBadge } from '@/components/shared/status-badge'
 import { formatCurrency, formatDate, formatDateShort } from '@/lib/utils'
-import type { Account, Transaction, Payable } from '@/types/database.types'
+import type { Account, Transaction } from '@/types/database.types'
 
 interface AccountDetailViewProps {
   account: Account
   transactions: Transaction[]
-  payables: Payable[]
   companyId: string
 }
 
-export function AccountDetailView({ account, transactions, payables, companyId }: AccountDetailViewProps) {
+export function AccountDetailView({ account, transactions, companyId }: AccountDetailViewProps) {
   const [editOpen, setEditOpen] = useState(false)
 
-  const totalReceivable = payables
-    .filter((p) => p.type === 'receivable' && p.status !== 'cancelled')
-    .reduce((sum, p) => sum + p.remaining_amount, 0)
-
-  const totalPayable = payables
-    .filter((p) => p.type === 'payable' && p.status !== 'cancelled')
-    .reduce((sum, p) => sum + p.remaining_amount, 0)
-
-  const netBalance = totalReceivable - totalPayable
+  // Balance Logic
+  // (+) Alacağımız: invoice_out, payment_out
+  // (-) Borcumuz: invoice_in, payment_in
+  let balance = 0
+  transactions.forEach(t => {
+    if (t.transaction_type === 'invoice_out' || t.transaction_type === 'payment_out') {
+      balance += t.amount
+    } else {
+      balance -= t.amount
+    }
+  })
 
   return (
     <>
@@ -68,51 +69,49 @@ export function AccountDetailView({ account, transactions, payables, companyId }
       </div>
 
       {/* Balance summary */}
-      <div className="grid gap-3 sm:grid-cols-3 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Alacak</p>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5">
-              {formatCurrency(totalReceivable)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Borç</p>
-            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 tabular-nums mt-0.5">
-              {formatCurrency(totalPayable)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground font-medium">Net Bakiye</p>
-            <p className={`text-lg font-bold tabular-nums mt-0.5 ${
-              netBalance >= 0
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-rose-600 dark:text-rose-400'
-            }`}>
-              {netBalance >= 0 ? '+' : ''}{formatCurrency(netBalance)}
-            </p>
+      <div className="mb-6">
+        <Card className="bg-primary/5 border-primary/20 shadow-sm">
+          <CardContent className="p-6 text-center">
+            <p className="text-sm text-muted-foreground font-medium mb-1">Güncel Bakiye Durumu</p>
+            {balance === 0 ? (
+              <p className="text-2xl font-bold tabular-nums">Bakiyesiz</p>
+            ) : balance > 0 ? (
+              <div>
+                <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {formatCurrency(balance)}
+                </p>
+                <p className="text-sm font-medium text-emerald-600/80 mt-1">Bizim Alacağımız Var</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-3xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                  {formatCurrency(Math.abs(balance))}
+                </p>
+                <p className="text-sm font-medium text-rose-600/80 mt-1">Bizim Borcumuz Var</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="info">
-        <TabsList>
-          <TabsTrigger value="info">Bilgiler</TabsTrigger>
-          <TabsTrigger value="payables">
-            Borç/Alacak ({payables.length})
+      <Tabs defaultValue="transactions">
+        <TabsList className="w-full h-auto p-1 bg-muted/50 rounded-xl mb-4">
+          <TabsTrigger value="transactions" className="flex-1 rounded-lg text-sm py-2">
+            İşlem Geçmişi ({transactions.length})
           </TabsTrigger>
-          <TabsTrigger value="transactions">
-            Hesap Ekstresi ({transactions.length})
+          <TabsTrigger value="info" className="flex-1 rounded-lg text-sm py-2">
+            Firma Bilgileri
           </TabsTrigger>
         </TabsList>
 
+        {/* Ledger Tab */}
+        <TabsContent value="transactions" className="mt-0">
+          <AccountLedger transactions={transactions as any} accountId={account.id} />
+        </TabsContent>
+
         {/* Info Tab */}
-        <TabsContent value="info" className="mt-4">
+        <TabsContent value="info" className="mt-0">
           <Card>
             <CardContent className="p-5 grid sm:grid-cols-2 gap-x-8 gap-y-4">
               {account.email && (
@@ -147,53 +146,6 @@ export function AccountDetailView({ account, transactions, payables, companyId }
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Payables Tab */}
-        <TabsContent value="payables" className="mt-4">
-          <Card>
-            <CardContent className="p-0">
-              {payables.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-10">
-                  Bu cariye ait kayıt bulunmuyor.
-                </p>
-              ) : (
-                <div className="divide-y">
-                  {payables.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-4 px-5 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{p.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {p.invoice_ref && `Ref: ${p.invoice_ref} · `}
-                          Vade: {p.due_date ? formatDateShort(p.due_date) : '—'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="text-right">
-                          <p className={`text-sm font-semibold tabular-nums ${
-                            p.type === 'receivable'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : 'text-rose-600 dark:text-rose-400'
-                          }`}>
-                            {formatCurrency(p.remaining_amount)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(p.original_amount)} üzerinden
-                          </p>
-                        </div>
-                        <StatusBadge status={p.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Ledger Tab */}
-        <TabsContent value="transactions" className="mt-4">
-          <AccountLedger transactions={transactions as any} accountId={account.id} />
         </TabsContent>
       </Tabs>
 

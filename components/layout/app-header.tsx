@@ -1,7 +1,6 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Separator } from '@/components/ui/separator'
 import {
   Breadcrumb,
@@ -29,9 +28,8 @@ export function AppHeader() {
   const segments = pathname.split('/').filter(Boolean)
 
   return (
-    <header className="flex h-14 items-center gap-2 border-b px-4 sticky top-0 z-40 bg-background/80 backdrop-blur-sm">
-      <SidebarTrigger className="-ml-1 h-8 w-8" />
-      <Separator orientation="vertical" className="h-4" />
+    <header className="flex h-14 items-center gap-2 px-4 sticky top-0 z-40 bg-background/80 backdrop-blur-sm lg:max-w-5xl lg:mx-auto lg:w-full">
+
 
       <Breadcrumb>
         <BreadcrumbList>
