@@ -46,10 +46,16 @@ export function UploadStatementDialog({ open, onOpenChange, accountId }: UploadS
         body: formData,
       })
 
-      const data = await res.json()
+      const text = await res.text()
+      let data
+      try {
+        data = JSON.parse(text)
+      } catch (e) {
+        throw new Error(`Sunucu Hatası: ${text.substring(0, 100)}`)
+      }
 
       if (!res.ok) {
-        throw new Error(`${data.error}: ${data.details || ''}`)
+        throw new Error(`${data.error || 'İşleme hatası'}: ${data.details || ''}`)
       }
 
       setParsedData(data.transactions)

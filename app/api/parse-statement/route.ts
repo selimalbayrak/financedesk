@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // We rely entirely on the environment variable for security
-const apiKey = process.env.GEMINI_API_KEY || ''
-const genAI = new GoogleGenerativeAI(apiKey)
-
 export const maxDuration = 60 // Vercel timeout extension (Pro max 300, Hobby max 60)
 
 export async function POST(req: NextRequest) {
@@ -16,9 +13,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Dosya bulunamadı' }, { status: 400 })
     }
 
+    const apiKey = process.env.GEMINI_API_KEY || ''
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API anahtarı bulunamadı. Lütfen Vercel üzerinden GEMINI_API_KEY ortam değişkenini ayarlayıp Redeploy edin.' }, { status: 400 })
+    }
+
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
+    const genAI = new GoogleGenerativeAI(apiKey)
     // Using gemini-2.5-flash specifically to avoid overloaded generic aliases
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
