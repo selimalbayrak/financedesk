@@ -28,10 +28,11 @@ const PAYMENT_METHODS = [
   'Nakit', 'Havale/EFT', 'Kredi Kartı', 'Çek', 'Senet'
 ]
 
-export function TransactionForm({ accounts }: { accounts: Account[] }) {
+export function TransactionForm({ accounts, safes }: { accounts: Account[], safes: Array<{id: string, name: string}> }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [type, setType] = useState<typeof TRANSACTION_TYPES[number]['id']>('payment_out')
+  const [paymentMethod, setPaymentMethod] = useState<string>('Nakit')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -44,13 +45,15 @@ export function TransactionForm({ accounts }: { accounts: Account[] }) {
     try {
       await createTransaction({
         account_id: formData.get('account_id') as string,
+        safe_id: formData.get('safe_id') as string,
         transaction_type: type,
         amount,
         description: formData.get('description') as string,
         transaction_date: formData.get('transaction_date') as string,
         payment_method: (type === 'payment_in' || type === 'payment_out') 
-          ? (formData.get('payment_method') as string)
-          : undefined
+          ? paymentMethod
+          : undefined,
+        bank_detail: (paymentMethod === 'Havale/EFT') ? (formData.get('bank_detail') as string) : undefined
       })
       toast.success('İşlem başarıyla eklendi!')
       router.push('/')
@@ -93,20 +96,41 @@ export function TransactionForm({ accounts }: { accounts: Account[] }) {
         </div>
 
         <div className="bg-card p-6 rounded-3xl border shadow-sm space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
-            <Select name="account_id" required>
-              <SelectTrigger className="h-12 rounded-xl">
-                <SelectValue placeholder="Bir cari seçin..." />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map(acc => (
-                  <SelectItem key={acc.id} value={acc.id}>
-                    {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
+              <Select name="account_id" required>
+                <SelectTrigger className="h-12 rounded-xl">
+                  <SelectValue placeholder="Bir cari seçin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map(acc => (
+                    <SelectItem key={acc.id} value={acc.id}>
+                      {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="safe_id">Hangi Kasadan/Kasaya?</Label>
+              <Select name="safe_id" required>
+                <SelectTrigger className="h-12 rounded-xl">
+                  <SelectValue placeholder="Kasa seçin..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {safes.map(safe => (
+                    <SelectItem key={safe.id} value={safe.id}>
+                      {safe.name}
+                    </SelectItem>
+                  ))}
+                  {safes.length === 0 && (
+                    <SelectItem value="none" disabled>Kasa bulunamadı</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -137,18 +161,32 @@ export function TransactionForm({ accounts }: { accounts: Account[] }) {
           </div>
 
           {(type === 'payment_out' || type === 'payment_in') && (
-            <div className="space-y-2">
-              <Label htmlFor="payment_method">Ödeme Şekli</Label>
-              <Select name="payment_method" defaultValue="Nakit">
-                <SelectTrigger className="h-12 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map(m => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="payment_method">Ödeme Şekli</Label>
+                <Select name="payment_method" value={paymentMethod} onValueChange={(val) => { if (val) setPaymentMethod(val) }}>
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {paymentMethod === 'Havale/EFT' && (
+                <div className="space-y-2">
+                  <Label htmlFor="bank_detail">Banka Adı / Detayı (İsteğe bağlı)</Label>
+                  <Input 
+                    id="bank_detail" 
+                    name="bank_detail" 
+                    className="h-12 rounded-xl"
+                    placeholder="Örn: Ziraat, Garanti..." 
+                  />
+                </div>
+              )}
             </div>
           )}
 

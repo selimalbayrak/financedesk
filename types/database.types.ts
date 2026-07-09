@@ -32,14 +32,28 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['accounts']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['accounts']['Insert']>
       }
+      safes: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['safes']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['safes']['Insert']>
+      }
       transactions: {
         Row: {
           id: string
           user_id: string
           company_id: string
           account_id: string | null
+          safe_id: string | null
           transaction_type: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in'
           payment_method: string | null
+          bank_detail: string | null
           category: string
           amount: number // stored as BIGINT kuruş, divide by 100 for display
           currency: string
@@ -85,6 +99,16 @@ export interface Database {
           balance: number
         }
       }
+      safe_balances: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          total_in: number
+          total_out: number
+          balance: number
+        }
+      }
     }
     Functions: Record<string, never>
     Enums: Record<string, never>
@@ -101,6 +125,10 @@ export type TransactionInsert = Database['public']['Tables']['transactions']['In
 
 export type TransactionLine = Database['public']['Tables']['transaction_lines']['Row']
 export type TransactionLineInsert = Database['public']['Tables']['transaction_lines']['Insert']
+
+export type Safe = Database['public']['Tables']['safes']['Row']
+export type SafeInsert = Database['public']['Tables']['safes']['Insert']
+export type SafeUpdate = Database['public']['Tables']['safes']['Update']
 
 // Extended types with joins
 export type TransactionWithAccount = Transaction & {

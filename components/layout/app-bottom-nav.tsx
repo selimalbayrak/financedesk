@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Users, History, Plus } from 'lucide-react'
+import { Home, Users, History, Plus, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -46,6 +46,17 @@ export function AppBottomNav() {
             </Button>
           </Link>
         </div>
+
+        {/* Safes */}
+        <Link 
+          href="/safes"
+          className={cn(
+            "flex flex-col items-center gap-1 transition-all duration-300",
+            pathname.startsWith('/safes') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
+          )}
+        >
+          <Wallet className="w-7 h-7 stroke-[2.5]" />
+        </Link>
 
         {/* Transactions (History) */}
         <Link 

@@ -11,16 +11,24 @@ export default async function NewTransactionPage() {
   }
 
   const supabase = await createClient()
-  const { data: accounts } = await supabase
-    .from('accounts')
-    .select('id, name, company_name')
-    .eq('company_id', companyInfo.id)
-    .is('deleted_at', null)
-    .order('name')
+  const [{ data: accounts }, { data: safes }] = await Promise.all([
+    supabase
+      .from('accounts')
+      .select('id, name, company_name')
+      .eq('company_id', companyInfo.id)
+      .is('deleted_at', null)
+      .order('name'),
+    supabase
+      .from('safes')
+      .select('id, name')
+      .eq('company_id', companyInfo.id)
+      .is('deleted_at', null)
+      .order('name')
+  ])
 
   return (
     <div className="pb-24">
-      <TransactionForm accounts={accounts ?? []} />
+      <TransactionForm accounts={accounts ?? []} safes={safes ?? []} />
     </div>
   )
 }

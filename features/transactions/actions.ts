@@ -6,11 +6,13 @@ import { getActiveCompany } from '@/lib/company'
 
 export async function createTransaction(data: {
   account_id: string
+  safe_id: string
   transaction_type: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in'
   amount: number
   description: string
   transaction_date: string
   payment_method?: string
+  bank_detail?: string
 }) {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) {
@@ -22,11 +24,13 @@ export async function createTransaction(data: {
   const { error } = await supabase.from('transactions').insert({
     company_id: companyInfo.id,
     account_id: data.account_id,
+    safe_id: data.safe_id,
     transaction_type: data.transaction_type,
     amount: data.amount,
     description: data.description,
     transaction_date: data.transaction_date,
     payment_method: data.payment_method || null,
+    bank_detail: data.bank_detail || null,
     category: data.transaction_type,
     currency: 'TRY'
   })
