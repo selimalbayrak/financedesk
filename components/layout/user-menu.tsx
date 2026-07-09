@@ -18,9 +18,11 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-full inline-flex h-10 w-10 items-center justify-center hover:bg-accent text-accent-foreground outline-none transition-colors">
-        <User className="h-5 w-5" />
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger render={
+        <Button variant="ghost" size="icon" className="rounded-full">
+          <User className="h-5 w-5" />
+        </Button>
+      } />
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>Hesabım</DropdownMenuLabel>
         
@@ -51,7 +53,15 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
 
         <DropdownMenuSeparator />
         
-        <DropdownMenuItem onClick={() => logout()} className="text-destructive focus:text-destructive cursor-pointer">
+        <DropdownMenuItem 
+          onClick={() => {
+            startTransition(() => {
+              logout()
+            })
+          }} 
+          className="text-destructive focus:text-destructive cursor-pointer"
+          disabled={isPending}
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Çıkış Yap</span>
         </DropdownMenuItem>
