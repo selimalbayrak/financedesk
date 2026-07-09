@@ -6,8 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { logout, switchCompany } from '@/app/actions'
@@ -24,12 +22,12 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
         </Button>
       } />
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>Hesabım</DropdownMenuLabel>
+        <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Hesabım</div>
         
         {companyInfo && companyInfo.allCompanies && companyInfo.allCompanies.length > 0 && (
           <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Şirketler</DropdownMenuLabel>
+            <div className="-mx-1 my-1 h-px bg-border" />
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Şirketler</div>
             {companyInfo.allCompanies.map((c: any) => (
               <DropdownMenuItem 
                 key={c.id} 
@@ -51,7 +49,7 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
           </>
         )}
 
-        <DropdownMenuSeparator />
+        <div className="-mx-1 my-1 h-px bg-border" />
         
         <DropdownMenuItem 
           onClick={() => {
