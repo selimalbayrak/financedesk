@@ -16,7 +16,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex flex-col min-h-screen pb-24 relative">
-      <AppHeader />
+      <AppHeader companyInfo={companyInfo} />
       <main className="flex-1 p-6 lg:max-w-5xl lg:mx-auto lg:w-full">
         {children}
       </main>

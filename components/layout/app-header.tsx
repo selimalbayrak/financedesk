@@ -24,7 +24,7 @@ const routeLabels: Record<string, string> = {
   invoices: 'Invoice Archive',
 }
 
-export function AppHeader() {
+export function AppHeader({ companyInfo }: { companyInfo?: any }) {
   const pathname = usePathname()
   const segments = pathname.split('/').filter(Boolean)
 
@@ -67,7 +67,7 @@ export function AppHeader() {
 
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
-        <UserMenu />
+        <UserMenu companyInfo={companyInfo} />
       </div>
     </header>
   )
