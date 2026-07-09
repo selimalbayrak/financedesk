@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { ThemeToggle } from './theme-toggle'
+import { UserMenu } from './user-menu'
 
 const routeLabels: Record<string, string> = {
   '': 'Dashboard',
@@ -64,8 +65,9 @@ export function AppHeader() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
   )

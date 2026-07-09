@@ -2,7 +2,7 @@ import { getActiveCompany } from '@/lib/company'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
-import { ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +11,7 @@ const TYPE_CONFIG = {
   payment_in: { label: 'Alınan Ödeme', icon: ArrowDownCircle, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' },
   invoice_out: { label: 'Kesilen Fatura', icon: PackageMinus, color: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' },
   invoice_in: { label: 'Gelen Fatura', icon: PackagePlus, color: 'text-rose-500 bg-rose-50 dark:bg-rose-500/10' },
+  safe_transfer: { label: 'Kasa Transferi', icon: ArrowRightLeft, color: 'text-blue-500 bg-blue-50 dark:bg-blue-500/10' },
 }
 
 export default async function TransactionsPage() {
@@ -26,7 +27,8 @@ export default async function TransactionsPage() {
     .select(`
       *,
       account:accounts(name),
-      safe:safes(name)
+      safe:safes!safe_id(name),
+      to_safe:safes!to_safe_id(name)
     `)
     .eq('company_id', companyInfo.id)
     .is('deleted_at', null)
@@ -60,20 +62,35 @@ export default async function TransactionsPage() {
                 </div>
                 <div>
                   <div className="font-semibold text-sm">
-                    {t.account?.name || 'Bilinmiyor'}
+                    {t.transaction_type === 'safe_transfer' ? 'Kasalar Arası Transfer' : (t.account?.name || 'Bilinmiyor')}
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                     <span>{new Date(t.transaction_date).toLocaleDateString('tr-TR')}</span>
-                    {t.safe && (
+                    
+                    {t.transaction_type === 'safe_transfer' ? (
                       <>
                         <span>•</span>
-                        <span>{t.safe.name}</span>
+                        <span>{t.safe?.name} &rarr; {t.to_safe?.name}</span>
                       </>
+                    ) : (
+                      t.safe && (
+                        <>
+                          <span>•</span>
+                          <span>{t.safe.name}</span>
+                        </>
+                      )
                     )}
+
                     {(t.payment_method || t.bank_detail) && (
                       <>
                         <span>•</span>
                         <span>{t.payment_method} {t.bank_detail && `(${t.bank_detail})`}</span>
+                      </>
+                    )}
+                    {t.invoice_number && (
+                      <>
+                        <span>•</span>
+                        <span>Fatura: {t.invoice_number}</span>
                       </>
                     )}
                   </div>

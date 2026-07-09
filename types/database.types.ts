@@ -51,7 +51,8 @@ export interface Database {
           company_id: string
           account_id: string | null
           safe_id: string | null
-          transaction_type: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in'
+          to_safe_id: string | null
+          transaction_type: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in' | 'safe_transfer' | 'income' | 'expense'
           payment_method: string | null
           bank_detail: string | null
           category: string
@@ -59,6 +60,7 @@ export interface Database {
           currency: string
           document_type: string | null
           document_no: string | null
+          invoice_number: string | null
           description: string | null
           reference_no: string | null
           transaction_date: string
@@ -67,7 +69,11 @@ export interface Database {
           updated_at: string
           deleted_at: string | null
         }
-        Insert: Omit<Database['public']['Tables']['transactions']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['transactions']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+          to_safe_id?: string | null
+          invoice_number?: string | null
+          transaction_type?: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in' | 'safe_transfer' | 'income' | 'expense'
+        }
         Update: Partial<Database['public']['Tables']['transactions']['Insert']>
       }
       transaction_lines: {
@@ -92,8 +98,16 @@ export interface Database {
           id: string
           user_id: string
           company_id: string
+          type: 'customer' | 'supplier' | 'both'
           name: string
-          type: string
+          company_name: string | null
+          tax_number: string | null
+          tax_office: string | null
+          email: string | null
+          phone: string | null
+          city: string | null
+          district: string | null
+          created_at: string
           positive_total: number
           negative_total: number
           balance: number

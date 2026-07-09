@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus } from 'lucide-react'
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +22,7 @@ const TRANSACTION_TYPES = [
   { id: 'payment_in', label: 'Alınan Ödeme', icon: ArrowDownCircle, color: 'text-emerald-500' },
   { id: 'invoice_out', label: 'Fatura Kestik (Verilen)', icon: PackageMinus, color: 'text-emerald-500' },
   { id: 'invoice_in', label: 'Fatura Geldi (Alınan)', icon: PackagePlus, color: 'text-rose-500' },
+  { id: 'safe_transfer', label: 'Kasalar Arası Transfer', icon: ArrowRightLeft, color: 'text-blue-500' },
 ] as const
 
 const PAYMENT_METHODS = [
@@ -44,13 +45,17 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
 
     try {
       await createTransaction({
-        account_id: formData.get('account_id') as string,
+        account_id: type === 'safe_transfer' ? undefined : (formData.get('account_id') as string),
         safe_id: formData.get('safe_id') as string,
+        to_safe_id: type === 'safe_transfer' ? (formData.get('to_safe_id') as string) : undefined,
         transaction_type: type,
         amount,
         description: formData.get('description') as string,
         transaction_date: formData.get('transaction_date') as string,
-        payment_method: (type === 'payment_in' || type === 'payment_out') 
+        invoice_number: (type === 'invoice_in' || type === 'invoice_out') 
+          ? (formData.get('invoice_number') as string)
+          : undefined,
+        payment_method: (type === 'payment_in' || type === 'payment_out' || type === 'safe_transfer') 
           ? paymentMethod
           : undefined,
         bank_detail: (paymentMethod === 'Havale/EFT') ? (formData.get('bank_detail') as string) : undefined
@@ -65,7 +70,7 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-2 mb-6">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
           <ArrowLeft className="w-5 h-5" />
@@ -76,7 +81,7 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
       <form onSubmit={onSubmit} className="space-y-8">
         <div className="space-y-4">
           <Label>Ne İşlemi Eklemek İstiyorsunuz?</Label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {TRANSACTION_TYPES.map(t => (
               <button
                 type="button"
@@ -97,24 +102,26 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
 
         <div className="bg-card p-6 rounded-3xl border shadow-sm space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
-              <Select name="account_id" required>
-                <SelectTrigger className="h-12 rounded-xl">
-                  <SelectValue placeholder="Bir cari seçin..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map(acc => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {type !== 'safe_transfer' && (
+              <div className="space-y-2">
+                <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
+                <Select name="account_id" required>
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue placeholder="Bir cari seçin..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             
             <div className="space-y-2">
-              <Label htmlFor="safe_id">Hangi Kasadan/Kasaya?</Label>
+              <Label htmlFor="safe_id">{type === 'safe_transfer' ? 'Gönderen Kasa/Banka' : 'Hangi Kasadan/Kasaya?'}</Label>
               <Select name="safe_id" required>
                 <SelectTrigger className="h-12 rounded-xl">
                   <SelectValue placeholder="Kasa seçin..." />
@@ -131,6 +138,27 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
                 </SelectContent>
               </Select>
             </div>
+
+            {type === 'safe_transfer' && (
+              <div className="space-y-2">
+                <Label htmlFor="to_safe_id">Alan Kasa/Banka</Label>
+                <Select name="to_safe_id" required>
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue placeholder="Alıcı kasa seçin..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {safes.map(safe => (
+                      <SelectItem key={safe.id} value={safe.id}>
+                        {safe.name}
+                      </SelectItem>
+                    ))}
+                    {safes.length === 0 && (
+                      <SelectItem value="none" disabled>Kasa bulunamadı</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -160,7 +188,19 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
             </div>
           </div>
 
-          {(type === 'payment_out' || type === 'payment_in') && (
+          {(type === 'invoice_in' || type === 'invoice_out') && (
+            <div className="space-y-2">
+              <Label htmlFor="invoice_number">Fatura Numarası (İsteğe bağlı)</Label>
+              <Input 
+                id="invoice_number" 
+                name="invoice_number" 
+                className="h-12 rounded-xl uppercase"
+                placeholder="Örn: ABC2024000000123" 
+              />
+            </div>
+          )}
+
+          {(type === 'payment_out' || type === 'payment_in' || type === 'safe_transfer') && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="payment_method">Ödeme Şekli</Label>
