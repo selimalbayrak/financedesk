@@ -115,6 +115,9 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
                         {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
                       </SelectItem>
                     ))}
+                    {accounts.length === 0 && (
+                      <SelectItem value="none" disabled>Kayıtlı cari bulunamadı</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
