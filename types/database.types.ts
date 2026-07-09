@@ -106,7 +106,6 @@ export interface Database {
           email: string | null
           phone: string | null
           city: string | null
-          district: string | null
           created_at: string
           positive_total: number
           negative_total: number
