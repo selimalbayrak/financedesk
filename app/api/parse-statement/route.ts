@@ -105,30 +105,38 @@ export async function POST(req: NextRequest) {
 
     const rawTransactions = JSON.parse(cleanJson)
 
-    // Robust parsing function for TR number formats
     function parseAmount(raw: string | number | null | undefined): number {
       if (!raw) return 0;
-      if (typeof raw === 'number') return raw; // Just in case AI returned a number
+      if (typeof raw === 'number') return Math.round(raw * 100);
       let str = raw.toString().trim();
       if (str === '-' || str === '') return 0;
       
+      const dotCount = (str.match(/\./g) || []).length;
+      const commaCount = (str.match(/,/g) || []).length;
       const lastDot = str.lastIndexOf('.');
       const lastComma = str.lastIndexOf(',');
-      
-      if (lastComma > lastDot) {
-        str = str.replace(/\\./g, '').replace(',', '.');
-      } else if (lastDot > lastComma) {
+
+      if (commaCount === 1 && dotCount >= 1 && lastComma > lastDot) {
+        str = str.replace(/\./g, '').replace(',', '.');
+      } else if (dotCount === 1 && commaCount >= 1 && lastDot > lastComma) {
         str = str.replace(/,/g, '');
-      } else {
-        if (lastComma !== -1) {
-           if (str.length - lastComma <= 3) {
-               str = str.replace(',', '.');
-           } else {
-               str = str.replace(',', '');
-           }
+      } else if (commaCount === 1 && dotCount === 0) {
+        if (str.length - lastComma <= 3) {
+          str = str.replace(',', '.');
+        } else {
+          str = str.replace(',', '');
+        }
+      } else if (dotCount >= 1 && commaCount === 0) {
+        if (dotCount > 1) {
+          str = str.replace(/\./g, '');
+        } else {
+          if (str.length - lastDot === 4) {
+            str = str.replace(/\./g, '');
+          }
         }
       }
 
+      str = str.replace(/\s/g, '');
       const num = parseFloat(str);
       if (isNaN(num)) return 0;
       return Math.round(num * 100);
