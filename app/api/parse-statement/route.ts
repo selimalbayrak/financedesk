@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
       Sana bir "Cari Hesap Ekstresi" (Ledger/Account Statement) PDF'i veriyorum.
       Bu PDF'teki tüm işlemleri (satırları) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
-      Eğer tutar "Borç" (Debit) sütunundaysa "debit" değerine, "Alacak" (Credit) sütunundaysa "credit" değerine kuruş cinsinden tamsayı olarak yaz. 
-      Örnek: 1.500,00 TL -> 150000, 23.223,67 -> 2322367.
-      (Tipik Türkiye muhasebe kayıtlarında Borç, müşterinin bize borçlandığı tutardır, Alacak müşterinin bize ödediği tutardır.)
+      ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      
+      Eğer tutar "Borç" (Debit) sütunundaysa "debit_raw" değerine, "Alacak" (Credit) sütunundaysa "credit_raw" değerine yaz. Boşsa veya çizgi varsa "0" yaz.
       
       Tarih formatını her zaman YYYY-MM-DD olarak ver.
       Belge numarası, fiş türü (örn: Toptan Satış Faturası, Nakit Ödeme, vb.) ve açıklamayı çıkar.
@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
           "document_no": "0000000000000001",
           "document_type": "Açılış Fişi",
           "description": "Önceki Dönemden Devir",
-          "debit": 348600000,
-          "credit": 0
+          "debit_raw": "3.486,00",
+          "credit_raw": "0"
         }
       ]
     `
@@ -58,9 +58,10 @@ export async function POST(req: NextRequest) {
       Sana bir "Banka Hesap Ekstresi" (Bank Statement) PDF'i veriyorum.
       Bu PDF'teki tüm işlemleri (hesap hareketleri satırlarını) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
-      Eğer hesaba para GİRDİYSE (Yatan/Alacak/Credit) "credit" alanına yaz, "debit" alanını 0 yap.
-      Eğer hesaptan para ÇIKTIYSA (Çekilen/Borç/Debit) "debit" alanına yaz, "credit" alanını 0 yap.
-      Tutar kuruş cinsinden tamsayı olmalıdır. Örnek: 1.500,00 TL -> 150000, 23.223,67 -> 2322367.
+      ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      
+      Eğer hesaba para GİRDİYSE (Yatan/Alacak/Credit) "credit_raw" alanına yaz, "debit_raw" alanını "0" yap.
+      Eğer hesaptan para ÇIKTIYSA (Çekilen/Borç/Debit) "debit_raw" alanına yaz, "credit_raw" alanını "0" yap.
       
       Tarih formatını her zaman YYYY-MM-DD olarak ver.
       Belge/dekont numarasını (varsa), işlem türünü (Havale, EFT, POS, vb.) ve tüm açıklamayı (karşı tarafın adı veya IBAN'ı vs.) çıkar. Açıklamayı detaylı tut ki sonradan hangi firmaya/kişiye ait olduğu anlaşılabilsin.
@@ -72,8 +73,8 @@ export async function POST(req: NextRequest) {
           "document_no": "12345678",
           "document_type": "Gelen Havale",
           "description": "Ahmet Yılmaz - Kira Ödemesi",
-          "debit": 0,
-          "credit": 1500000
+          "debit_raw": "0",
+          "credit_raw": "1.500,00"
         }
       ]
     `
@@ -100,7 +101,53 @@ export async function POST(req: NextRequest) {
       cleanJson = cleanJson.replace(/\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '')
     }
 
-    const transactions = JSON.parse(cleanJson)
+    const rawTransactions = JSON.parse(cleanJson)
+
+    // Robust parsing function for TR number formats
+    function parseAmount(raw: string | number | null | undefined): number {
+      if (!raw) return 0;
+      if (typeof raw === 'number') return raw; // Just in case AI returned a number
+      let str = raw.toString().trim();
+      if (str === '-' || str === '') return 0;
+      
+      const lastDot = str.lastIndexOf('.');
+      const lastComma = str.lastIndexOf(',');
+      
+      if (lastComma > lastDot) {
+        str = str.replace(/\\./g, '').replace(',', '.');
+      } else if (lastDot > lastComma) {
+        str = str.replace(/,/g, '');
+      } else {
+        if (lastComma !== -1) {
+           if (str.length - lastComma <= 3) {
+               str = str.replace(',', '.');
+           } else {
+               str = str.replace(',', '');
+           }
+        }
+      }
+
+      const num = parseFloat(str);
+      if (isNaN(num)) return 0;
+      return Math.round(num * 100);
+    }
+
+    const transactions = rawTransactions.map((t: any) => {
+      let debit = 0;
+      let credit = 0;
+      
+      if ('debit_raw' in t) debit = parseAmount(t.debit_raw);
+      else if ('debit' in t) debit = parseAmount(t.debit); // fallback
+
+      if ('credit_raw' in t) credit = parseAmount(t.credit_raw);
+      else if ('credit' in t) credit = parseAmount(t.credit); // fallback
+
+      return {
+        ...t,
+        debit,
+        credit
+      }
+    })
 
     return NextResponse.json({ transactions })
   } catch (error: any) {

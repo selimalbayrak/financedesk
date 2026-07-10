@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useTransition } from 'react'
-import { UploadCloud, CheckCircle2, AlertCircle, FileText, Loader2, ArrowRight } from 'lucide-react'
+import { UploadCloud, CheckCircle2, AlertCircle, FileText, Loader2, ArrowRight, Trash2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -87,6 +87,29 @@ export function ImportForm({ accounts, safes }: Props) {
     } finally {
       setIsUploading(false)
     }
+  }
+
+  const updateRow = (index: number, field: keyof ParsedTransaction, value: any) => {
+    setParsedData(prev => prev ? prev.map((item, i) => i === index ? { ...item, [field]: value } : item) : null)
+  }
+
+  const updateAmount = (index: number, isCredit: boolean, newAmountStr: string) => {
+    const val = parseFloat(newAmountStr)
+    if (isNaN(val)) return
+    const newKurus = Math.round(val * 100)
+    
+    setParsedData(prev => prev ? prev.map((item, i) => {
+      if (i !== index) return item
+      if (isCredit) {
+        return { ...item, credit: newKurus }
+      } else {
+        return { ...item, debit: newKurus }
+      }
+    }) : null)
+  }
+
+  const deleteRow = (index: number) => {
+    setParsedData(prev => prev ? prev.filter((_, i) => i !== index) : null)
   }
 
   const handleSave = () => {
@@ -289,6 +312,7 @@ export function ImportForm({ accounts, safes }: Props) {
                     <th className="px-4 py-3 font-medium">AÇIKLAMA</th>
                     <th className="px-4 py-3 font-medium">TUTAR</th>
                     <th className="px-4 py-3 font-medium">{statementType === 'bank' ? 'CARİ EŞLEŞTİRME' : 'KASA SEÇİMİ'}</th>
+                    <th className="px-4 py-3 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -298,17 +322,34 @@ export function ImportForm({ accounts, safes }: Props) {
                     
                     return (
                       <tr key={index} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-4 py-3 text-foreground whitespace-nowrap">{t.date}</td>
-                        <td className="px-4 py-3 text-muted-foreground max-w-xs truncate" title={t.description}>
-                          {t.document_type ? <span className="font-medium text-foreground block mb-0.5">{t.document_type}</span> : null}
-                          {t.description}
+                        <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                          <Input 
+                            value={t.date} 
+                            onChange={(e) => updateRow(index, 'date', e.target.value)}
+                            className="h-8 w-28 text-xs"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground min-w-[200px]">
+                          {t.document_type ? <span className="font-medium text-foreground block mb-0.5 text-xs">{t.document_type}</span> : null}
+                          <Input 
+                            value={t.description} 
+                            onChange={(e) => updateRow(index, 'description', e.target.value)}
+                            className="h-8 text-xs"
+                          />
                         </td>
                         <td className="px-4 py-3 font-medium whitespace-nowrap">
-                          {isCredit ? (
-                            <span className="text-emerald-500">+ {amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
-                          ) : (
-                            <span className="text-destructive">- {amount.toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
-                          )}
+                          <div className="flex items-center gap-1">
+                            <span className={isCredit ? "text-emerald-500" : "text-destructive"}>
+                              {isCredit ? '+' : '-'}
+                            </span>
+                            <Input 
+                              type="number"
+                              value={amount}
+                              onChange={(e) => updateAmount(index, isCredit, e.target.value)}
+                              className="h-8 w-24 text-xs tabular-nums"
+                              step="0.01"
+                            />
+                          </div>
                         </td>
                         <td className="px-4 py-2 min-w-[200px]">
                           {statementType === 'bank' ? (
@@ -341,6 +382,16 @@ export function ImportForm({ accounts, safes }: Props) {
                               </SelectContent>
                             </Select>
                           )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => deleteRow(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </td>
                       </tr>
                     )
