@@ -4,9 +4,13 @@ import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { TransactionWithLines } from '@/types/database.types'
-import { ChevronDown, ChevronRight, FileUp } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { UploadStatementDialog } from './upload-statement-dialog'
+import { EditTransactionDialog } from './edit-transaction-dialog'
+import { DeleteTransactionDialog } from './delete-transaction-dialog'
+import { DeleteAllTransactionsDialog } from './delete-all-transactions-dialog'
 
 interface AccountLedgerProps {
   transactions: TransactionWithLines[]
@@ -16,6 +20,10 @@ interface AccountLedgerProps {
 export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const [uploadOpen, setUploadOpen] = useState(false)
+  
+  const [transactionToEdit, setTransactionToEdit] = useState<TransactionWithLines | null>(null)
+  const [transactionToDelete, setTransactionToDelete] = useState<TransactionWithLines | null>(null)
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false)
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }))
@@ -43,15 +51,12 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
 
   return (
     <div className="space-y-4">
-      {/* PDF özelliğini şimdilik gizliyoruz */}
-      {/* 
-      <div className="flex justify-end">
-        <Button onClick={() => setUploadOpen(true)} size="sm" className="gap-2">
-          <FileUp className="h-4 w-4" />
-          PDF'ten Aktar
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => setDeleteAllOpen(true)} size="sm" variant="destructive" className="gap-2">
+          <Trash2 className="h-4 w-4" />
+          Tümünü Sil
         </Button>
-      </div> 
-      */}
+      </div>
 
       <Card className="border-border/50 shadow-sm">
         <CardContent className="p-0 overflow-x-auto">
@@ -65,6 +70,7 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                 <th className="px-4 py-3 font-medium text-right text-emerald-600 dark:text-emerald-400">Bizim Alacağımız (+)</th>
                 <th className="px-4 py-3 font-medium text-right text-rose-600 dark:text-rose-400">Bizim Borcumuz (-)</th>
                 <th className="px-4 py-3 font-medium text-right">Kalan Bakiye</th>
+                <th className="px-4 py-3 w-10"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -116,6 +122,28 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                             {tx.runningBalance >= 0 ? 'Alacak' : 'Borç'}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-accent-foreground h-8 w-8 p-0">
+                              <span className="sr-only">Menüyü aç</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setTransactionToEdit(tx)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                <span>Düzenle</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => setTransactionToDelete(tx)}
+                                className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Sil</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
                       </tr>
                       {hasLines && isExpanded && (
                         <tr className="bg-muted/10">
@@ -162,6 +190,24 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
         open={uploadOpen} 
         onOpenChange={setUploadOpen} 
         accountId={accountId} 
+      />
+
+      <EditTransactionDialog
+        transaction={transactionToEdit}
+        open={!!transactionToEdit}
+        onOpenChange={(open) => !open && setTransactionToEdit(null)}
+      />
+
+      <DeleteTransactionDialog
+        transaction={transactionToDelete}
+        open={!!transactionToDelete}
+        onOpenChange={(open) => !open && setTransactionToDelete(null)}
+      />
+
+      <DeleteAllTransactionsDialog
+        accountId={accountId}
+        open={deleteAllOpen}
+        onOpenChange={setDeleteAllOpen}
       />
     </div>
   )

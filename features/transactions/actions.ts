@@ -89,3 +89,68 @@ export async function batchCreateTransactions(transactions: any[]) {
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
+
+export async function updateTransaction(id: string, data: {
+  transaction_type: 'payment_out' | 'payment_in' | 'invoice_out' | 'invoice_in' | 'safe_transfer' | 'income' | 'expense'
+  amount: number
+  description: string
+  transaction_date: string
+  document_no?: string
+}) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) throw new Error('Company not found')
+
+  const supabase = await createClient()
+  
+  const { error } = await supabase.from('transactions').update({
+    transaction_type: data.transaction_type,
+    amount: data.amount,
+    description: data.description,
+    transaction_date: data.transaction_date,
+    document_no: data.document_no || null,
+    category: data.transaction_type,
+  } as any).eq('id', id).eq('company_id', companyInfo.id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  revalidatePath('/accounts')
+  revalidatePath('/transactions')
+  revalidatePath('/safes')
+}
+
+export async function deleteTransaction(id: string) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) throw new Error('Company not found')
+
+  const supabase = await createClient()
+  
+  const { error } = await supabase.from('transactions').update({
+    deleted_at: new Date().toISOString()
+  }).eq('id', id).eq('company_id', companyInfo.id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  revalidatePath('/accounts')
+  revalidatePath('/transactions')
+  revalidatePath('/safes')
+}
+
+export async function deleteAllAccountTransactions(accountId: string) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) throw new Error('Company not found')
+
+  const supabase = await createClient()
+  
+  const { error } = await supabase.from('transactions').update({
+    deleted_at: new Date().toISOString()
+  }).eq('account_id', accountId).eq('company_id', companyInfo.id).is('deleted_at', null)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  revalidatePath('/accounts')
+  revalidatePath('/transactions')
+  revalidatePath('/safes')
+}
