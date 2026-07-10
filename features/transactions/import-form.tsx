@@ -50,6 +50,23 @@ export function ImportForm({ accounts, safes }: Props) {
   // For Ledger Statement: each row needs a safe_id
   const [rowSafes, setRowSafes] = useState<Record<number, string>>({})
 
+  const [globalSafeId, setGlobalSafeId] = useState<string>('')
+  const [globalAccountId, setGlobalAccountId] = useState<string>('')
+
+  const handleApplyGlobalSafe = () => {
+    if (!globalSafeId) return
+    const newSafes: Record<number, string> = {}
+    parsedData?.forEach((_, i) => newSafes[i] = globalSafeId)
+    setRowSafes(newSafes)
+  }
+
+  const handleApplyGlobalAccount = () => {
+    if (!globalAccountId) return
+    const newAccounts: Record<number, string> = {}
+    parsedData?.forEach((_, i) => newAccounts[i] = globalAccountId)
+    setRowAccounts(newAccounts)
+  }
+
   const [isPending, startTransition] = useTransition()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -172,7 +189,7 @@ export function ImportForm({ accounts, safes }: Props) {
       const prepared: PreparedTransaction = {
         transaction_date: t.date,
         description: t.description,
-        amount: amount / 100, // convert back from kuruş
+        amount: amount, // do not divide by 100, we need kuruş in DB
         transaction_type: type,
         invoice_number: t.document_no || undefined,
         safe_id: statementType === 'bank' ? selectedSafeId : rowSafes[i],
@@ -315,6 +332,50 @@ export function ImportForm({ accounts, safes }: Props) {
               </Button>
             </div>
             
+            {/* Bulk Apply Bar */}
+            <div className="px-6 py-3 border-b border-border/50 bg-muted/20 flex flex-wrap gap-4 items-end">
+              {statementType === 'bank' ? (
+                <div className="flex items-end gap-2 max-w-sm w-full">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Tüm Satırlara Uygula (Cari Seç)</Label>
+                    <Select value={globalAccountId} onValueChange={(val) => setGlobalAccountId(val || '')}>
+                      <SelectTrigger className="h-8 bg-background">
+                        <SelectValue placeholder="Toplu Cari Seç">
+                          {globalAccountId === 'none' ? 'Cari Yok' : accounts.find(a => a.id === globalAccountId)?.company_name || accounts.find(a => a.id === globalAccountId)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map(a => (
+                          <SelectItem key={a.id} value={a.id}>{a.company_name || a.name}</SelectItem>
+                        ))}
+                        <SelectItem value="none">Cari Yok</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="secondary" size="sm" className="h-8" onClick={handleApplyGlobalAccount} disabled={!globalAccountId}>Uygula</Button>
+                </div>
+              ) : (
+                <div className="flex items-end gap-2 max-w-sm w-full">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-xs">Tüm Satırlara Uygula (Kasa Seç)</Label>
+                    <Select value={globalSafeId} onValueChange={(val) => setGlobalSafeId(val || '')}>
+                      <SelectTrigger className="h-8 bg-background">
+                        <SelectValue placeholder="Toplu Kasa Seç">
+                          {safes.find(s => s.id === globalSafeId)?.name}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {safes.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button variant="secondary" size="sm" className="h-8" onClick={handleApplyGlobalSafe} disabled={!globalSafeId}>Uygula</Button>
+                </div>
+              )}
+            </div>
+            
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="text-xs text-muted-foreground bg-muted/30 border-b border-border/50">
@@ -369,7 +430,9 @@ export function ImportForm({ accounts, safes }: Props) {
                               onValueChange={(val) => setRowAccounts(prev => ({...prev, [index]: val || ''}))}
                             >
                               <SelectTrigger className="h-8">
-                                <SelectValue placeholder="Cari Seç" />
+                                <SelectValue placeholder="Cari Seç">
+                                  {rowAccounts[index] === 'none' ? 'Cari Yok (Masraf/Gelir)' : accounts.find(a => a.id === rowAccounts[index])?.company_name || accounts.find(a => a.id === rowAccounts[index])?.name}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {accounts.map(a => (
@@ -384,7 +447,9 @@ export function ImportForm({ accounts, safes }: Props) {
                               onValueChange={(val) => setRowSafes(prev => ({...prev, [index]: val || ''}))}
                             >
                               <SelectTrigger className="h-8">
-                                <SelectValue placeholder="Kasa Seç" />
+                                <SelectValue placeholder="Kasa Seç">
+                                  {safes.find(s => s.id === rowSafes[index])?.name}
+                                </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
                                 {safes.map(s => (

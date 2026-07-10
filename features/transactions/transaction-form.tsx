@@ -34,6 +34,9 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
   const [loading, setLoading] = useState(false)
   const [type, setType] = useState<typeof TRANSACTION_TYPES[number]['id']>('payment_out')
   const [paymentMethod, setPaymentMethod] = useState<string>('Nakit')
+  const [accountId, setAccountId] = useState<string>('')
+  const [safeId, setSafeId] = useState<string>('')
+  const [toSafeId, setToSafeId] = useState<string>('')
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -105,9 +108,13 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
             {type !== 'safe_transfer' && (
               <div className="space-y-2">
                 <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
-                <Select name="account_id" required>
+                <Select name="account_id" required value={accountId} onValueChange={(val) => setAccountId(val || '')}>
                   <SelectTrigger className="h-12 rounded-xl">
-                    <SelectValue placeholder="Bir cari seçin..." />
+                    <SelectValue placeholder="Bir cari seçin...">
+                      {accounts.find(a => a.id === accountId) ? (
+                        `${accounts.find(a => a.id === accountId)?.company_name || accounts.find(a => a.id === accountId)?.name} ${accounts.find(a => a.id === accountId)?.company_name ? `(${accounts.find(a => a.id === accountId)?.name})` : ''}`
+                      ) : null}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {accounts.map(acc => (
@@ -125,9 +132,11 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
             
             <div className="space-y-2">
               <Label htmlFor="safe_id">{type === 'safe_transfer' ? 'Gönderen Kasa/Banka' : 'Hangi Kasadan/Kasaya?'}</Label>
-              <Select name="safe_id" required>
+              <Select name="safe_id" required value={safeId} onValueChange={(val) => setSafeId(val || '')}>
                 <SelectTrigger className="h-12 rounded-xl">
-                  <SelectValue placeholder="Kasa seçin..." />
+                  <SelectValue placeholder="Kasa seçin...">
+                    {safes.find(s => s.id === safeId)?.name}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {safes.map(safe => (
@@ -145,9 +154,11 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
             {type === 'safe_transfer' && (
               <div className="space-y-2">
                 <Label htmlFor="to_safe_id">Alan Kasa/Banka</Label>
-                <Select name="to_safe_id" required>
+                <Select name="to_safe_id" required value={toSafeId} onValueChange={(val) => setToSafeId(val || '')}>
                   <SelectTrigger className="h-12 rounded-xl">
-                    <SelectValue placeholder="Alıcı kasa seçin..." />
+                    <SelectValue placeholder="Alıcı kasa seçin...">
+                      {safes.find(s => s.id === toSafeId)?.name}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {safes.map(safe => (

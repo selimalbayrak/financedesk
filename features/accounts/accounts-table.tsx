@@ -111,7 +111,7 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
           return (
             <div className="flex flex-col">
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums text-sm">
-                +{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(bal)}
+                +{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(bal / 100)}
               </span>
               <span className="text-[10px] text-emerald-600/70 font-medium">Alacağımız</span>
             </div>
@@ -120,7 +120,7 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
         return (
           <div className="flex flex-col">
             <span className="text-rose-600 dark:text-rose-400 font-semibold tabular-nums text-sm">
-              -{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Math.abs(bal))}
+              -{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Math.abs(bal) / 100)}
             </span>
             <span className="text-[10px] text-rose-600/70 font-medium">Borcumuz</span>
           </div>
