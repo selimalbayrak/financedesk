@@ -76,6 +76,17 @@ export function ImportForm({ accounts, safes }: Props) {
         body: formData
       })
 
+      if (!res.ok) {
+        const text = await res.text()
+        let errorMessage = text
+        if (text.includes('<html')) {
+          if (res.status === 413) errorMessage = "Yüklenen PDF dosyası çok büyük (Limit: 4.5MB)."
+          else if (res.status === 504) errorMessage = "İşlem zaman aşımına uğradı. Lütfen daha küçük bir PDF deneyin."
+          else errorMessage = "Sunucuda beklenmeyen bir hata oluştu."
+        }
+        throw new Error(`API Hatası (${res.status}): ${errorMessage.slice(0, 100)}`)
+      }
+
       const data = await res.json()
       if (data.error) {
         alert('Hata: ' + data.error)
