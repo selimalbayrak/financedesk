@@ -34,20 +34,21 @@ export async function POST(req: NextRequest) {
       Bu PDF'teki tüm işlemleri (satırları) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
       ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      Eğer pdf'te '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
       
       Eğer tutar "Borç" (Debit) sütunundaysa "debit_raw" değerine, "Alacak" (Credit) sütunundaysa "credit_raw" değerine yaz. Boşsa veya çizgi varsa "0" yaz.
       
       Tarih formatını her zaman YYYY-MM-DD olarak ver.
       Belge numarası, fiş türü (örn: Toptan Satış Faturası, Nakit Ödeme, vb.) ve açıklamayı çıkar.
       
-      Döndürmen gereken JSON yapısı:
+      Döndürmen gereken JSON yapısı (değerler örnektir):
       [
         {
           "date": "2025-01-01",
           "document_no": "0000000000000001",
           "document_type": "Açılış Fişi",
-          "description": "Önceki Dönemden Devir",
-          "debit_raw": "3.486,00",
+          "description": "Örnek İşlem Açıklaması",
+          "debit_raw": "1.234.567,89",
           "credit_raw": "0"
         }
       ]
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       Bu PDF'teki tüm işlemleri (hesap hareketleri satırlarını) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
       ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      Eğer pdf'te '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
       
       Eğer hesaba para GİRDİYSE (Yatan/Alacak/Credit) "credit_raw" alanına yaz, "debit_raw" alanını "0" yap.
       Eğer hesaptan para ÇIKTIYSA (Çekilen/Borç/Debit) "debit_raw" alanına yaz, "credit_raw" alanını "0" yap.
@@ -66,15 +68,15 @@ export async function POST(req: NextRequest) {
       Tarih formatını her zaman YYYY-MM-DD olarak ver.
       Belge/dekont numarasını (varsa), işlem türünü (Havale, EFT, POS, vb.) ve tüm açıklamayı (karşı tarafın adı veya IBAN'ı vs.) çıkar. Açıklamayı detaylı tut ki sonradan hangi firmaya/kişiye ait olduğu anlaşılabilsin.
       
-      Döndürmen gereken JSON yapısı:
+      Döndürmen gereken JSON yapısı (değerler örnektir):
       [
         {
           "date": "2025-01-01",
           "document_no": "12345678",
           "document_type": "Gelen Havale",
-          "description": "Ahmet Yılmaz - Kira Ödemesi",
+          "description": "Örnek Şirket A.Ş. - Fatura Ödemesi",
           "debit_raw": "0",
-          "credit_raw": "1.500,00"
+          "credit_raw": "9.876.543,21"
         }
       ]
     `
