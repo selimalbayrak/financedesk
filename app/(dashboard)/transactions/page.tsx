@@ -3,7 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft } from 'lucide-react'
-
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 export const dynamic = 'force-dynamic'
 
 const TYPE_CONFIG = {
@@ -38,9 +39,17 @@ export default async function TransactionsPage() {
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Son İşlemler</h1>
-        <p className="text-muted-foreground">Tüm cari hesaplar ve kasalardaki son hareketleriniz.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight">Son İşlemler</h1>
+          <p className="text-muted-foreground">Tüm cari hesaplar ve kasalardaki son hareketleriniz.</p>
+        </div>
+        <Link href="/transactions/import">
+          <Button variant="outline" className="bg-card text-foreground rounded-full shadow-sm hover:bg-muted">
+            <PackagePlus className="w-4 h-4 mr-2" />
+            PDF'den Aktar
+          </Button>
+        </Link>
       </div>
 
       <Card className="rounded-3xl border shadow-sm divide-y overflow-hidden">

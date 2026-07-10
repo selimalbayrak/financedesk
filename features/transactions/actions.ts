@@ -52,3 +52,40 @@ export async function createTransaction(data: {
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
+
+export async function batchCreateTransactions(transactions: any[]) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) {
+    throw new Error('Company not found')
+  }
+
+  const supabase = await createClient()
+  
+  const formattedTransactions = transactions.map(data => ({
+    company_id: companyInfo.id,
+    account_id: data.account_id || null,
+    safe_id: data.safe_id,
+    to_safe_id: data.to_safe_id || null,
+    transaction_type: data.transaction_type,
+    amount: data.amount,
+    description: data.description,
+    transaction_date: data.transaction_date,
+    payment_method: data.payment_method || null,
+    bank_detail: data.bank_detail || null,
+    invoice_number: data.invoice_number || null,
+    category: data.transaction_type,
+    currency: 'TRY'
+  }))
+
+  const { error } = await supabase.from('transactions').insert(formattedTransactions)
+
+  if (error) {
+    console.error('Batch create transactions error:', error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/')
+  revalidatePath('/accounts')
+  revalidatePath('/transactions')
+  revalidatePath('/safes')
+}

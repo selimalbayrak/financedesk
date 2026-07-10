@@ -6,8 +6,11 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Activity,
-  Wallet
+  Wallet,
+  PackagePlus
 } from 'lucide-react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/company'
 import type { Metadata } from 'next'
@@ -114,11 +117,17 @@ export default async function DashboardPage() {
       <div className="grid gap-4">
         {/* Recent Transactions */}
         <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-3 border-b bg-muted/20">
+          <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2 text-primary">
               <Activity className="w-4 h-4" />
               <CardTitle className="text-sm font-semibold">Son Eklenen İşlemler</CardTitle>
             </div>
+            <Link href="/transactions/import">
+              <Button variant="outline" size="sm" className="h-8 rounded-full">
+                <PackagePlus className="w-3.5 h-3.5 mr-2" />
+                PDF'den Aktar
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="p-0">
             {data.recentTransactions.length === 0 ? (
