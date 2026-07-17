@@ -154,3 +154,39 @@ export async function deleteAllAccountTransactions(accountId: string) {
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
+
+export async function createEmployeeTransaction(data: {
+  employee_id: string
+  safe_id: string
+  transaction_type: 'advance_payment' | 'salary_payment'
+  amount: number
+  description: string
+  date: string
+}) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) {
+    throw new Error('Company not found')
+  }
+
+  const supabase = await createClient()
+  
+  const { error } = await supabase.from('employee_transactions').insert({
+    company_id: companyInfo.id,
+    employee_id: data.employee_id,
+    safe_id: data.safe_id,
+    transaction_type: data.transaction_type,
+    amount: data.amount,
+    description: data.description,
+    date: data.date
+  })
+
+  if (error) {
+    console.error('Create employee transaction error:', error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/')
+  revalidatePath('/employees')
+  revalidatePath(`/employees/${data.employee_id}`)
+  revalidatePath('/safes')
+}

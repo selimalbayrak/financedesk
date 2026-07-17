@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft } from 'lucide-react'
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft, Users, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MoneyInput } from '@/components/ui/money-input'
-import { createTransaction } from './actions'
+import { createTransaction, createEmployeeTransaction } from './actions'
 import { toast } from 'sonner'
 
 type Account = {
@@ -24,18 +24,21 @@ const TRANSACTION_TYPES = [
   { id: 'invoice_out', label: 'Fatura Kestik (Verilen)', icon: PackageMinus, color: 'text-emerald-500' },
   { id: 'invoice_in', label: 'Fatura Geldi (Alınan)', icon: PackagePlus, color: 'text-rose-500' },
   { id: 'safe_transfer', label: 'Kasalar Arası Transfer', icon: ArrowRightLeft, color: 'text-blue-500' },
+  { id: 'salary_payment', label: 'Maaş/Avans Ödemesi', icon: Users, color: 'text-amber-500' },
+  { id: 'cheque_note', label: 'Çek / Senet', icon: CreditCard, color: 'text-indigo-500' },
 ] as const
 
 const PAYMENT_METHODS = [
   'Nakit', 'Havale/EFT', 'Kredi Kartı', 'Çek', 'Senet'
 ]
 
-export function TransactionForm({ accounts, safes }: { accounts: Account[], safes: Array<{id: string, name: string}> }) {
+export function TransactionForm({ accounts, safes, employees = [] }: { accounts: Account[], safes: Array<{id: string, name: string}>, employees?: Array<{id: string, name: string}> }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [type, setType] = useState<typeof TRANSACTION_TYPES[number]['id']>('payment_out')
   const [paymentMethod, setPaymentMethod] = useState<string>('Nakit')
   const [accountId, setAccountId] = useState<string>('')
+  const [employeeId, setEmployeeId] = useState<string>('')
   const [safeId, setSafeId] = useState<string>('')
   const [toSafeId, setToSafeId] = useState<string>('')
   const [amount, setAmount] = useState<number>(0)
@@ -49,22 +52,33 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
     const amount = Math.round(parseFloat(amountStr.replace(',', '.')) * 100)
 
     try {
-      await createTransaction({
-        account_id: type === 'safe_transfer' ? undefined : (formData.get('account_id') as string),
-        safe_id: formData.get('safe_id') as string,
-        to_safe_id: type === 'safe_transfer' ? (formData.get('to_safe_id') as string) : undefined,
-        transaction_type: type,
-        amount,
-        description: formData.get('description') as string,
-        transaction_date: formData.get('transaction_date') as string,
-        invoice_number: (type === 'invoice_in' || type === 'invoice_out') 
-          ? (formData.get('invoice_number') as string)
-          : undefined,
-        payment_method: (type === 'payment_in' || type === 'payment_out' || type === 'safe_transfer') 
-          ? paymentMethod
-          : undefined,
-        bank_detail: (paymentMethod === 'Havale/EFT') ? (formData.get('bank_detail') as string) : undefined
-      })
+      if (type === 'salary_payment') {
+        await createEmployeeTransaction({
+          employee_id: formData.get('employee_id') as string,
+          safe_id: formData.get('safe_id') as string,
+          transaction_type: 'salary_payment', // Use salary_payment for everything from this shortcut for simplicity, or we could add a toggle
+          amount,
+          description: formData.get('description') as string,
+          date: formData.get('transaction_date') as string,
+        })
+      } else {
+        await createTransaction({
+          account_id: type === 'safe_transfer' ? undefined : (formData.get('account_id') as string),
+          safe_id: formData.get('safe_id') as string,
+          to_safe_id: type === 'safe_transfer' ? (formData.get('to_safe_id') as string) : undefined,
+          transaction_type: type as any,
+          amount,
+          description: formData.get('description') as string,
+          transaction_date: formData.get('transaction_date') as string,
+          invoice_number: (type === 'invoice_in' || type === 'invoice_out') 
+            ? (formData.get('invoice_number') as string)
+            : undefined,
+          payment_method: (type === 'payment_in' || type === 'payment_out' || type === 'safe_transfer') 
+            ? paymentMethod
+            : undefined,
+          bank_detail: (paymentMethod === 'Havale/EFT') ? (formData.get('bank_detail') as string) : undefined
+        })
+      }
       toast.success('İşlem başarıyla eklendi!')
       router.push('/')
     } catch (error: any) {
@@ -91,7 +105,13 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
               <button
                 type="button"
                 key={t.id}
-                onClick={() => setType(t.id)}
+                onClick={() => {
+                  if (t.id === 'cheque_note') {
+                    router.push('/finance/cheques/new')
+                  } else {
+                    setType(t.id as typeof type)
+                  }
+                }}
                 className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all ${
                   type === t.id 
                     ? 'border-primary bg-primary/5 shadow-sm scale-[1.02]' 
@@ -107,7 +127,7 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
 
         <div className="bg-card p-6 rounded-3xl border shadow-sm space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            {type !== 'safe_transfer' && (
+            {type !== 'safe_transfer' && type !== 'salary_payment' && (
               <div className="space-y-2">
                 <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
                 <Select name="account_id" required value={accountId} onValueChange={(val) => setAccountId(val || '')}>
@@ -126,6 +146,29 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
                     ))}
                     {accounts.length === 0 && (
                       <SelectItem value="none" disabled>Kayıtlı cari bulunamadı</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {type === 'salary_payment' && (
+              <div className="space-y-2">
+                <Label htmlFor="employee_id">Personel Seçin</Label>
+                <Select name="employee_id" required value={employeeId} onValueChange={(val) => setEmployeeId(val || '')}>
+                  <SelectTrigger className="h-12 rounded-xl">
+                    <SelectValue placeholder="Bir personel seçin...">
+                      {employees.find(e => e.id === employeeId)?.name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.name}
+                      </SelectItem>
+                    ))}
+                    {employees.length === 0 && (
+                      <SelectItem value="none" disabled>Kayıtlı personel bulunamadı</SelectItem>
                     )}
                   </SelectContent>
                 </Select>

@@ -141,6 +141,64 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['transaction_lines']['Row'], 'id' | 'created_at'>
         Update: Partial<Database['public']['Tables']['transaction_lines']['Insert']>
       }
+      cheques_notes: {
+        Row: {
+          id: string
+          company_id: string
+          type: 'cheque' | 'promissory_note'
+          direction: 'in' | 'out'
+          status: 'portfolio' | 'endorsed' | 'cashed' | 'bounced'
+          amount: number
+          issue_date: string
+          due_date: string
+          contact_name: string
+          bank_name: string | null
+          document_number: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['cheques_notes']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['cheques_notes']['Insert']>
+      }
+      loans: {
+        Row: {
+          id: string
+          company_id: string
+          bank_name: string
+          loan_amount: number
+          total_repayment: number
+          interest_rate: number | null
+          start_date: string
+          end_date: string
+          monthly_installment: number
+          status: 'active' | 'paid_off'
+          notes: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['loans']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['loans']['Insert']>
+      }
+      loan_installments: {
+        Row: {
+          id: string
+          company_id: string
+          loan_id: string
+          due_date: string
+          amount_due: number
+          amount_paid: number
+          status: 'pending' | 'paid' | 'late'
+          payment_date: string | null
+          safe_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['loan_installments']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['loan_installments']['Insert']>
+      }
     }
     Views: {
       account_balances: {
