@@ -307,3 +307,112 @@ export async function unpayLoanInstallment(installmentId: string) {
     return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
   }
 }
+
+export async function cashChequeNote(data: {
+  chequeId: string
+  safeId: string
+  applyDiscount: boolean
+  discountRate?: number
+  expenseTarget?: 'safe' | 'account'
+  expenseTargetId?: string // safeId or accountId
+}) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch the cheque
+    const { data: cheque, error: fetchErr } = await supabase
+      .from('cheques_notes')
+      .select('*')
+      .eq('id', data.chequeId)
+      .single()
+
+    if (fetchErr || !cheque) return { error: 'Çek/Senet bulunamadı.' }
+    if (cheque.status === 'cashed') return { error: 'Bu evrak zaten tahsil edilmiş.' }
+
+    // Calculate days until due date from today
+    const today = new Date()
+    const dueDate = new Date(cheque.due_date)
+    const diffTime = dueDate.getTime() - today.getTime()
+    const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
+
+    let discountAmount = 0
+    let netAmount = cheque.amount
+
+    if (data.applyDiscount && data.discountRate && data.discountRate > 0) {
+      const monthlyRate = data.discountRate / 100
+      const dailyRate = monthlyRate / 30
+      // cheque.amount is in cents
+      discountAmount = Math.round(cheque.amount * dailyRate * diffDays)
+      netAmount = cheque.amount - discountAmount
+    }
+
+    // 2. Update cheque status to cashed
+    const { error: updateErr } = await supabase
+      .from('cheques_notes')
+      .update({
+        status: 'cashed'
+      })
+      .eq('id', data.chequeId)
+
+    if (updateErr) return { error: updateErr.message }
+
+    // 3. Create transactions
+    // Transaction 1: Net Amount goes into the Safe
+    const { error: txError } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      safe_id: data.safeId,
+      transaction_type: 'payment_in',
+      amount: netAmount,
+      description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı (Net Tutar)`,
+      transaction_date: today.toISOString().split('T')[0],
+      payment_method: 'Havale/EFT',
+      category: 'payment_in',
+      currency: 'TRY'
+    })
+
+    if (txError) return { error: `Tahsilat kaydı oluşturulamadı: ${txError.message}` }
+
+    // Transaction 2: If there's a discount expense
+    if (data.applyDiscount && discountAmount > 0) {
+      if (data.expenseTarget === 'account' && data.expenseTargetId) {
+        // Charge the customer (increases their debt)
+        const { error: expError } = await supabase.from('transactions').insert({
+          company_id: companyInfo.id,
+          account_id: data.expenseTargetId,
+          transaction_type: 'payment_out',
+          amount: discountAmount,
+          description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Vade Farkı Yansıtma (${data.discountRate}%)`,
+          transaction_date: today.toISOString().split('T')[0],
+          payment_method: 'Nakit',
+          category: 'payment_out',
+          currency: 'TRY'
+        })
+        if (expError) return { error: `Müşteri borç yansıtma kaydı oluşturulamadı: ${expError.message}` }
+      } else {
+        // Charge to safe (reduces safe balance as expense)
+        const targetSafeId = data.expenseTargetId || data.safeId
+        const { error: expError } = await supabase.from('transactions').insert({
+          company_id: companyInfo.id,
+          safe_id: targetSafeId,
+          transaction_type: 'payment_out',
+          amount: discountAmount,
+          description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discountRate}%)`,
+          transaction_date: today.toISOString().split('T')[0],
+          payment_method: 'Nakit',
+          category: 'payment_out',
+          currency: 'TRY'
+        })
+        if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
+      }
+    }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}

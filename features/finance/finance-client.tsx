@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { payLoanInstallment, unpayLoanInstallment } from './actions'
+import { ChequeCashModal } from './cheque-cash-modal'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,10 +23,15 @@ interface FinanceClientProps {
   loans: any[]
   installments: any[]
   safes: any[]
+  accounts: any[]
 }
 
-export function FinanceClient({ cheques, loans, installments, safes }: FinanceClientProps) {
+export function FinanceClient({ cheques, loans, installments, safes, accounts }: FinanceClientProps) {
   const [activeTab, setActiveTab] = useState('cheques')
+  
+  // Cheque Cash Modal States
+  const [cashModalOpen, setCashModalOpen] = useState(false)
+  const [selectedCheque, setSelectedCheque] = useState<any>(null)
 
   const handlePay = async (installmentId: string, safeId: string) => {
     try {
@@ -97,34 +103,51 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {cheques.map(cheque => (
-                <Card key={cheque.id} className="shadow-sm">
-                  <CardHeader className="pb-3 border-b bg-muted/20">
-                    <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                      <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
-                        cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {cheque.status === 'portfolio' ? 'Portföyde' :
-                         cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Tutar:</span>
-                      <span className="font-bold text-lg">{formatCurrency(cheque.amount)}</span>
+                <Card key={cheque.id} className="shadow-sm flex flex-col justify-between">
+                  <div>
+                    <CardHeader className="pb-3 border-b bg-muted/20">
+                      <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                        <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${
+                          cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
+                          cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {cheque.status === 'portfolio' ? 'Portföyde' :
+                           cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Tutar:</span>
+                        <span className="font-bold text-lg">{formatCurrency(cheque.amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Muhatap:</span>
+                        <span className="font-medium">{cheque.contact_name}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Vade Tarihi:</span>
+                        <span className="font-medium text-rose-600">{formatDate(cheque.due_date)}</span>
+                      </div>
+                    </CardContent>
+                  </div>
+                  {cheque.status === 'portfolio' && cheque.direction === 'in' && (
+                    <div className="p-4 pt-0 border-t mt-auto flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedCheque(cheque)
+                          setCashModalOpen(true)
+                        }}
+                        className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full"
+                      >
+                        Tahsil Et (Nakit Girişi / Kırdır)
+                      </Button>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Muhatap:</span>
-                      <span className="font-medium">{cheque.contact_name}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Vade Tarihi:</span>
-                      <span className="font-medium text-rose-600">{formatDate(cheque.due_date)}</span>
-                    </div>
-                  </CardContent>
+                  )}
                 </Card>
               ))}
             </div>
@@ -249,6 +272,15 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Cheque Cash Modal */}
+      <ChequeCashModal
+        isOpen={cashModalOpen}
+        onClose={() => setCashModalOpen(false)}
+        cheque={selectedCheque}
+        safes={safes}
+        accounts={accounts}
+      />
     </div>
   )
 }

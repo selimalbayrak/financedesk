@@ -2,26 +2,31 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, Activity } from 'lucide-react'
+import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { AccountFormSheet } from './account-form-sheet'
 import { AccountLedger } from './ledger/account-ledger'
-import { AccountTypeBadge, StatusBadge } from '@/components/shared/status-badge'
-import { formatCurrency, formatDate, formatDateShort } from '@/lib/utils'
-import type { Account, Transaction, TransactionWithLines } from '@/types/database.types'
+import { AccountTypeBadge } from '@/components/shared/status-badge'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import type { Account, TransactionWithLines } from '@/types/database.types'
+import { ChequeCashModal } from '../finance/cheque-cash-modal'
 
 interface AccountDetailViewProps {
   account: Account
   transactions: TransactionWithLines[]
+  cheques?: any[]
+  safes?: any[]
   companyId: string
   companyName?: string
 }
 
-export function AccountDetailView({ account, transactions, companyId, companyName }: AccountDetailViewProps) {
+export function AccountDetailView({ account, transactions, cheques = [], safes = [], companyId, companyName }: AccountDetailViewProps) {
   const [editOpen, setEditOpen] = useState(false)
+  const [cashModalOpen, setCashModalOpen] = useState(false)
+  const [selectedCheque, setSelectedCheque] = useState<any>(null)
 
   // Balance Logic
   // (+) Alacağımız: invoice_out, payment_out
@@ -34,6 +39,13 @@ export function AccountDetailView({ account, transactions, companyId, companyNam
       balance -= t.amount
     }
   })
+
+  // Format this Account into Account type expected by ChequeCashModal
+  const modalAccounts = [{
+    id: account.id,
+    name: account.name,
+    company_name: account.company_name
+  }]
 
   return (
     <>
@@ -97,9 +109,12 @@ export function AccountDetailView({ account, transactions, companyId, companyNam
 
       {/* Tabs */}
       <Tabs defaultValue="transactions" className="print:block">
-        <TabsList className="w-full h-auto p-1 bg-muted/50 rounded-xl mb-4 print:hidden">
+        <TabsList className="w-full h-auto p-1 bg-muted/50 rounded-xl mb-4 print:hidden flex">
           <TabsTrigger value="transactions" className="flex-1 rounded-lg text-sm py-2">
             İşlem Geçmişi ({transactions.length})
+          </TabsTrigger>
+          <TabsTrigger value="cheques" className="flex-1 rounded-lg text-sm py-2">
+            Çek ve Senetler ({cheques.length})
           </TabsTrigger>
           <TabsTrigger value="info" className="flex-1 rounded-lg text-sm py-2">
             Firma Bilgileri
@@ -118,6 +133,67 @@ export function AccountDetailView({ account, transactions, companyId, companyNam
               company_name: account.company_name
             }}
           />
+        </TabsContent>
+
+        {/* Cheques Tab */}
+        <TabsContent value="cheques" className="m-0 border rounded-xl p-4 sm:p-6 bg-card print:hidden">
+          {cheques.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+              <CreditCard className="w-12 h-12 mb-4 opacity-20" />
+              <p>Bu cariye ait çek veya senet bulunmuyor</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {cheques.map(cheque => (
+                <Card key={cheque.id} className="shadow-sm flex flex-col justify-between border-border/50">
+                  <div>
+                    <CardHeader className="pb-3 border-b bg-muted/20">
+                      <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                        <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${
+                          cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
+                          cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {cheque.status === 'portfolio' ? 'Portföyde' :
+                           cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Tutar:</span>
+                        <span className="font-bold text-lg">{formatCurrency(cheque.amount)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Muhatap:</span>
+                        <span className="font-medium">{cheque.contact_name}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Vade Tarihi:</span>
+                        <span className="font-medium text-rose-600">{formatDate(cheque.due_date)}</span>
+                      </div>
+                    </CardContent>
+                  </div>
+                  {cheque.status === 'portfolio' && cheque.direction === 'in' && (
+                    <div className="p-4 pt-0 border-t mt-auto flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedCheque(cheque)
+                          setCashModalOpen(true)
+                        }}
+                        className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full"
+                      >
+                        Tahsil Et (Nakit Girişi / Kırdır)
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* Info Tab */}
@@ -164,6 +240,14 @@ export function AccountDetailView({ account, transactions, companyId, companyNam
         onOpenChange={setEditOpen}
         account={account}
         companyId={companyId}
+      />
+
+      <ChequeCashModal
+        isOpen={cashModalOpen}
+        onClose={() => setCashModalOpen(false)}
+        cheque={selectedCheque}
+        safes={safes}
+        accounts={modalAccounts}
       />
     </>
   )

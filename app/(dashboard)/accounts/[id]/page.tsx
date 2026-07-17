@@ -28,7 +28,12 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
 
   const supabase = await createClient()
 
-  const [{ data: account }, { data: transactions }] = await Promise.all([
+  const [
+    { data: account },
+    { data: transactions },
+    { data: cheques },
+    { data: safes }
+  ] = await Promise.all([
     supabase.from('accounts').select('*').eq('id', id).eq('company_id', companyInfo.id).single(),
     supabase
       .from('transactions')
@@ -38,6 +43,19 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
       .is('deleted_at', null)
       .order('transaction_date', { ascending: true })
       .order('created_at', { ascending: true }),
+    supabase
+      .from('cheques_notes')
+      .select('*')
+      .eq('account_id', id)
+      .eq('company_id', companyInfo.id)
+      .is('deleted_at', null)
+      .order('due_date'),
+    supabase
+      .from('safes')
+      .select('id, name')
+      .eq('company_id', companyInfo.id)
+      .is('deleted_at', null)
+      .order('name')
   ])
 
   if (!account) notFound()
@@ -46,6 +64,8 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
     <AccountDetailView
       account={account}
       transactions={transactions ?? []}
+      cheques={cheques ?? []}
+      safes={safes ?? []}
       companyId={companyInfo.id}
       companyName={companyInfo.name}
     />
