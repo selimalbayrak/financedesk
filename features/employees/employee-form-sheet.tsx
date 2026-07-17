@@ -53,18 +53,23 @@ export function EmployeeFormSheet({ open, onOpenChange, employee, companyId }: E
       role: employee?.role ?? '',
       start_date: employee?.start_date ?? '',
       wage_type: (employee?.wage_type as any) ?? 'monthly',
-      wage_amount: employee ? employee.wage_amount : 0,
-      daily_food_allowance: employee ? employee.daily_food_allowance : 0,
-      daily_transport_allowance: employee ? employee.daily_transport_allowance : 0,
+      wage_amount: employee ? employee.wage_amount / 100 : 0,
+      daily_food_allowance: employee ? employee.daily_food_allowance / 100 : 0,
+      daily_transport_allowance: employee ? employee.daily_transport_allowance / 100 : 0,
       is_active: employee?.is_active ?? true,
     },
   })
 
   async function onSubmit(values: EmployeeFormValues) {
     const supabase = createClient()
-    const cleanValues = Object.fromEntries(
-      Object.entries(values).map(([k, v]) => [k, v === '' ? null : v])
-    )
+    const cleanValues = {
+      ...Object.fromEntries(
+        Object.entries(values).map(([k, v]) => [k, v === '' ? null : v])
+      ),
+      wage_amount: Math.round(values.wage_amount * 100),
+      daily_food_allowance: Math.round(values.daily_food_allowance * 100),
+      daily_transport_allowance: Math.round(values.daily_transport_allowance * 100)
+    }
 
     startTransition(async () => {
       const db = supabase

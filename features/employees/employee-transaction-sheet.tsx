@@ -80,6 +80,7 @@ export function EmployeeTransactionSheet({
     const supabase = createClient()
     const cleanValues = {
       ...values,
+      amount: Math.round(values.amount * 100),
       safe_id: values.safe_id === '' ? null : values.safe_id,
       company_id: companyId,
       employee_id: employeeId

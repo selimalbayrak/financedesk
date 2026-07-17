@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, Save } from 'lucide-react'
 import { getDaysInMonth, getDefaultStatusForDate } from '@/lib/holidays'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 interface EmployeeCalendarProps {
   employeeId: string
@@ -44,6 +45,7 @@ export function EmployeeCalendar({ employeeId, companyId }: EmployeeCalendarProp
   const [records, setRecords] = useState<Record<string, AttendanceRecord>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   const year = currentDate.getFullYear()
   const month = currentDate.getMonth()
@@ -117,13 +119,16 @@ export function EmployeeCalendar({ employeeId, companyId }: EmployeeCalendarProp
   const handleSave = () => {
     startTransition(async () => {
       const supabase = createClient()
-      const recordsToUpsert = Object.values(records).map(r => ({
-        id: r.id,
-        company_id: companyId,
-        employee_id: employeeId,
-        date: r.date,
-        status: r.status
-      }))
+      const recordsToUpsert = Object.values(records).map(r => {
+        const record: any = {
+          company_id: companyId,
+          employee_id: employeeId,
+          date: r.date,
+          status: r.status
+        }
+        if (r.id) record.id = r.id
+        return record
+      })
       
       const { error } = await supabase
         .from('employee_attendance')
@@ -134,6 +139,7 @@ export function EmployeeCalendar({ employeeId, companyId }: EmployeeCalendarProp
         console.error(error)
       } else {
         toast.success('Puantaj başarıyla kaydedildi')
+        router.refresh()
         loadAttendance()
       }
     })
