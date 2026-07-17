@@ -47,6 +47,7 @@ export default async function AccountDetailPage({ params }: AccountDetailPagePro
       account={account}
       transactions={transactions ?? []}
       companyId={companyInfo.id}
+      companyName={companyInfo.name}
     />
   )
 }

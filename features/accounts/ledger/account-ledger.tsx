@@ -15,10 +15,15 @@ import { DeleteAllTransactionsDialog } from './delete-all-transactions-dialog'
 interface AccountLedgerProps {
   transactions: TransactionWithLines[]
   accountId: string
-  account: Account
+  companyId: string
+  companyName?: string
+  accountInfo: {
+    name: string
+    company_name: string | null
+  }
 }
 
-export function AccountLedger({ transactions, accountId, account }: AccountLedgerProps) {
+export function AccountLedger({ transactions, accountId, companyId, companyName, accountInfo }: AccountLedgerProps) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const [uploadOpen, setUploadOpen] = useState(false)
   
@@ -73,13 +78,12 @@ export function AccountLedger({ transactions, accountId, account }: AccountLedge
         <div className="grid grid-cols-2 gap-8 mb-8 text-sm">
           <div>
             <h3 className="font-bold underline mb-2">Gönderen / Hazırlayan</h3>
-            <p>FinanceDesk Sistemi</p>
+            <p className="font-semibold">{companyName || 'FinanceDesk Kullanıcısı'}</p>
           </div>
           <div>
             <h3 className="font-bold underline mb-2">Alıcı (Cari)</h3>
-            <p className="font-semibold">{account.company_name || account.name}</p>
-            {account.company_name && <p>{account.name}</p>}
-            {account.tax_number && <p>VD / No: {account.tax_office} / {account.tax_number}</p>}
+            <p className="font-semibold">{accountInfo.company_name || accountInfo.name}</p>
+            {accountInfo.company_name && <p>{accountInfo.name}</p>}
           </div>
         </div>
         
@@ -219,9 +223,19 @@ export function AccountLedger({ transactions, accountId, account }: AccountLedge
       </Card>
 
       {/* Print-only Footer (Mutabakat Formu) */}
-      <div className="hidden print:block mt-16 border-t pt-8">
-        <div className="text-center font-bold text-lg mb-8">
-          Genel Bakiye: {currentBalance === 0 ? 'Bakiyesiz' : currentBalance > 0 ? `${formatCurrency(currentBalance)} (Alacaklıyız)` : `${formatCurrency(Math.abs(currentBalance))} (Borçluyuz)`}
+      <div className="hidden print:block mt-8">
+        <div className="flex justify-end mb-12">
+          <div className="text-right">
+            <p className="text-sm text-gray-600 mb-1">Genel Bakiye</p>
+            <p className="font-bold text-base">
+              {currentBalance === 0 ? 'Bakiyesiz' : formatCurrency(Math.abs(currentBalance))}
+              {currentBalance !== 0 && (
+                <span className="text-xs ml-1 font-normal text-gray-500">
+                  {currentBalance > 0 ? 'Alacak' : 'Borç'}
+                </span>
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-between text-sm pt-8">

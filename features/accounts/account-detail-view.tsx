@@ -11,15 +11,16 @@ import { AccountFormSheet } from './account-form-sheet'
 import { AccountLedger } from './ledger/account-ledger'
 import { AccountTypeBadge, StatusBadge } from '@/components/shared/status-badge'
 import { formatCurrency, formatDate, formatDateShort } from '@/lib/utils'
-import type { Account, Transaction } from '@/types/database.types'
+import type { Account, Transaction, TransactionWithLines } from '@/types/database.types'
 
 interface AccountDetailViewProps {
   account: Account
-  transactions: Transaction[]
+  transactions: TransactionWithLines[]
   companyId: string
+  companyName?: string
 }
 
-export function AccountDetailView({ account, transactions, companyId }: AccountDetailViewProps) {
+export function AccountDetailView({ account, transactions, companyId, companyName }: AccountDetailViewProps) {
   const [editOpen, setEditOpen] = useState(false)
 
   // Balance Logic
@@ -106,8 +107,17 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
         </TabsList>
 
         {/* Ledger Tab */}
-        <TabsContent value="transactions" className="mt-0">
-          <AccountLedger transactions={transactions as any} accountId={account.id} account={account} />
+        <TabsContent value="transactions" className="m-0 border rounded-xl p-4 sm:p-6 bg-card print:border-none print:p-0 print:bg-transparent">
+          <AccountLedger 
+            transactions={transactions} 
+            accountId={account.id} 
+            companyId={companyId} 
+            companyName={companyName}
+            accountInfo={{
+              name: account.name,
+              company_name: account.company_name
+            }}
+          />
         </TabsContent>
 
         {/* Info Tab */}
