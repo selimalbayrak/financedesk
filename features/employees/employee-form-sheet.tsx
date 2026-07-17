@@ -20,6 +20,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { MoneyInput } from '@/components/ui/money-input'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -53,6 +54,8 @@ export function EmployeeFormSheet({ open, onOpenChange, employee, companyId }: E
       start_date: employee?.start_date ?? '',
       wage_type: (employee?.wage_type as any) ?? 'monthly',
       wage_amount: employee ? employee.wage_amount : 0,
+      daily_food_allowance: employee ? employee.daily_food_allowance : 0,
+      daily_transport_allowance: employee ? employee.daily_transport_allowance : 0,
       is_active: employee?.is_active ?? true,
     },
   })
@@ -166,11 +169,45 @@ export function EmployeeFormSheet({ open, onOpenChange, employee, companyId }: E
                   <FormItem>
                     <FormLabel>Ücret Tutarı (TL) *</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      <MoneyInput
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="daily_food_allowance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Günlük Yemek (TL)</FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="daily_transport_allowance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Günlük Yol (TL)</FormLabel>
+                    <FormControl>
+                      <MoneyInput
+                        value={field.value}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />

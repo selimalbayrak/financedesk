@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { MoneyInput } from '@/components/ui/money-input'
 import {
   Select,
   SelectContent,
@@ -58,32 +59,22 @@ export function EmployeeTransactionSheet({
   const form = useForm<EmployeeTransactionFormValues>({
     resolver: zodResolver(employeeTransactionSchema),
     defaultValues: {
-      transaction_type: 'wage_earning',
-      amount: wageType === 'daily' ? wageAmount : 0, // default to daily wage if daily
+      transaction_type: 'advance_payment',
+      amount: 0,
       date: new Date().toISOString().split('T')[0],
-      description: wageType === 'daily' ? 'Günlük Yevmiye' : '',
+      description: '',
       safe_id: '',
     },
   })
 
-  // Watch transaction type to reset or set amount/description
   const watchTxType = form.watch('transaction_type')
   useEffect(() => {
-    if (watchTxType === 'wage_earning') {
-      if (wageType === 'daily') {
-        form.setValue('amount', wageAmount)
-        form.setValue('description', 'Günlük Yevmiye')
-      } else {
-        form.setValue('amount', wageAmount)
-        form.setValue('description', 'Aylık Maaş Hakedişi')
-      }
-    } else {
-      form.setValue('description', watchTxType === 'advance_payment' ? 'Avans Ödemesi' : 'Maaş Ödemesi')
-      if (watchTxType === 'advance_payment') {
-        form.setValue('amount', 0)
-      }
+    if (watchTxType === 'advance_payment') {
+      form.setValue('description', 'Avans Ödemesi')
+    } else if (watchTxType === 'salary_payment') {
+      form.setValue('description', 'Maaş Ödemesi')
     }
-  }, [watchTxType, wageAmount, wageType, form])
+  }, [watchTxType, form])
 
   async function onSubmit(values: EmployeeTransactionFormValues) {
     const supabase = createClient()
@@ -108,7 +99,7 @@ export function EmployeeTransactionSheet({
         <SheetHeader>
           <SheetTitle>Personel İşlemi Ekle</SheetTitle>
           <SheetDescription>
-            Hakediş (puantaj) ekleyin veya avans/maaş ödemesi yapın.
+            Avans veya maaş ödemesi yapın. Hakedişler takvim üzerinden hesaplanır.
           </SheetDescription>
         </SheetHeader>
 
@@ -128,7 +119,6 @@ export function EmployeeTransactionSheet({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="wage_earning">Hakediş (Çalışma)</SelectItem>
                       <SelectItem value="advance_payment">Avans Ödemesi</SelectItem>
                       <SelectItem value="salary_payment">Maaş Ödemesi</SelectItem>
                     </SelectContent>
@@ -186,11 +176,9 @@ export function EmployeeTransactionSheet({
                 <FormItem>
                   <FormLabel>Tutar (TL) *</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    <MoneyInput 
+                      value={field.value}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

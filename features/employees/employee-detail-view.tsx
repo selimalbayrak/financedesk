@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmployeeFormSheet } from './employee-form-sheet'
 import { EmployeeTransactionSheet } from './employee-transaction-sheet'
+import { EmployeeCalendar } from './employee-calendar'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
 import type { EmployeeBalance, EmployeeTransaction, SafeBalance } from '@/types/database.types'
 import { createClient } from '@/lib/supabase/client'
@@ -103,6 +104,10 @@ export function EmployeeDetailView({ employee, transactions, safes, companyId }:
         </Card>
       </div>
 
+      <div className="mb-6">
+        <EmployeeCalendar employeeId={employee.id} companyId={companyId} />
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm text-left">
@@ -129,16 +134,15 @@ export function EmployeeDetailView({ employee, transactions, safes, companyId }:
                     <td className="px-4 py-3 whitespace-nowrap">{formatDateShort(tx.date)}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-foreground">
-                        {tx.transaction_type === 'wage_earning' ? 'Maaş/Yevmiye Hakedişi' : 
-                         tx.transaction_type === 'advance_payment' ? 'Avans Ödemesi' : 'Maaş Ödemesi'}
+                        {tx.transaction_type === 'advance_payment' ? 'Avans Ödemesi' : 'Maaş Ödemesi'}
                       </div>
                     </td>
                     <td className="px-4 py-3">{tx.description || '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
-                      {tx.transaction_type === 'wage_earning' ? formatCurrency(tx.amount) : ''}
+                      {/* Hakediş is no longer a manual transaction, it's calculated */}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-rose-600 dark:text-rose-400 font-medium">
-                      {tx.transaction_type !== 'wage_earning' ? formatCurrency(tx.amount) : ''}
+                      {formatCurrency(tx.amount)}
                     </td>
                     <td className="px-4 py-3">
                       <Button variant="ghost" size="icon" onClick={() => handleDeleteTx(tx.id)} disabled={isDeleting} className="h-8 w-8 text-muted-foreground hover:text-destructive">

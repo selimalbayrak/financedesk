@@ -41,6 +41,8 @@ export interface Database {
           start_date: string | null
           wage_type: string
           wage_amount: number
+          daily_food_allowance: number
+          daily_transport_allowance: number
           is_active: boolean
           created_at: string
           updated_at: string
@@ -48,6 +50,20 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['employees']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['employees']['Insert']>
+      }
+      employee_attendance: {
+        Row: {
+          id: string
+          company_id: string
+          employee_id: string
+          date: string
+          status: 'full_day' | 'half_day' | 'absent' | 'holiday' | 'paid_leave' | 'unpaid_leave'
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['employee_attendance']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['employee_attendance']['Insert']>
       }
       employee_transactions: {
         Row: {
@@ -155,6 +171,8 @@ export interface Database {
           start_date: string | null
           wage_type: string
           wage_amount: number
+          daily_food_allowance: number
+          daily_transport_allowance: number
           is_active: boolean
           total_earned: number
           total_paid: number

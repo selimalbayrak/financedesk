@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MoneyInput } from '@/components/ui/money-input'
 import { updateTransaction } from '@/features/transactions/actions'
 import { Loader2 } from 'lucide-react'
 import type { Transaction } from '@/types/database.types'
@@ -18,7 +20,15 @@ interface EditTransactionDialogProps {
 }
 
 export function EditTransactionDialog({ transaction, open, onOpenChange }: EditTransactionDialogProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [amount, setAmount] = useState(0)
+
+  React.useEffect(() => {
+    if (transaction) {
+      setAmount(transaction.amount / 100)
+    }
+  }, [transaction])
   
   if (!transaction) return null
 
@@ -83,14 +93,10 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
             </div>
             <div className="grid gap-2">
               <Label htmlFor="amount">Tutar</Label>
-              <Input
-                id="amount"
+              <MoneyInput
                 name="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={transaction.amount / 100}
-                required
+                value={amount}
+                onChange={setAmount}
               />
             </div>
             <div className="grid gap-2">

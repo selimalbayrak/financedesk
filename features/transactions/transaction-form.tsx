@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MoneyInput } from '@/components/ui/money-input'
 import { createTransaction } from './actions'
 import { toast } from 'sonner'
 
@@ -37,6 +38,7 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
   const [accountId, setAccountId] = useState<string>('')
   const [safeId, setSafeId] = useState<string>('')
   const [toSafeId, setToSafeId] = useState<string>('')
+  const [amount, setAmount] = useState<number>(0)
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -178,15 +180,10 @@ export function TransactionForm({ accounts, safes }: { accounts: Account[], safe
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">Tutar (TL)</Label>
-              <Input 
-                id="amount" 
+              <MoneyInput 
                 name="amount" 
-                type="number" 
-                step="0.01" 
-                min="0"
-                required 
-                className="h-12 rounded-xl text-lg font-semibold"
-                placeholder="0.00" 
+                value={amount}
+                onChange={setAmount}
               />
             </div>
             <div className="space-y-2">
