@@ -69,12 +69,38 @@ export default async function DashboardPage() {
 
   const employees = employeesRaw ?? []
 
+  // 4. Get finance summary stats (loans & cheques)
+  const [
+    { data: activeLoansInstallments },
+    { data: activeCheques }
+  ] = await Promise.all([
+    supabase
+      .from('loan_installments')
+      .select('amount_due, status')
+      .in('status', ['pending', 'late'])
+      .eq('company_id', companyInfo.id),
+    supabase
+      .from('cheques_notes')
+      .select('amount, direction, status')
+      .eq('status', 'portfolio')
+      .eq('company_id', companyInfo.id)
+  ])
+
+  const totalLoanRemaining = (activeLoansInstallments ?? []).reduce((sum, i) => sum + i.amount_due, 0)
+  const totalChequesIn = (activeCheques ?? []).filter(c => c.direction === 'in').reduce((sum, c) => sum + c.amount, 0)
+  const totalChequesOut = (activeCheques ?? []).filter(c => c.direction === 'out').reduce((sum, c) => sum + c.amount, 0)
+
   const dashboardData = {
     totalReceivable,
     totalPayable,
     netBalance: totalReceivable - totalPayable,
     recentTransactions,
     employees,
+    financeSummary: {
+      totalLoanRemaining,
+      totalChequesIn,
+      totalChequesOut
+    }
   }
 
   return <DashboardClient data={dashboardData} />

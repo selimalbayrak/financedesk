@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowDownCircle, ArrowUpCircle, Activity, Wallet, PackagePlus, Settings, Users } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Activity, Wallet, PackagePlus, Settings, Users, Landmark } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -32,25 +32,32 @@ interface DashboardData {
   netBalance: number
   recentTransactions: TxRow[]
   employees: EmployeeRow[]
+  financeSummary?: {
+    totalLoanRemaining: number
+    totalChequesIn: number
+    totalChequesOut: number
+  }
 }
 
 interface DashboardClientProps {
   data: DashboardData
 }
 
-type WidgetKey = 'kpi' | 'transactions' | 'employees'
+type WidgetKey = 'kpi' | 'transactions' | 'employees' | 'finance'
 
 const WIDGET_NAMES: Record<WidgetKey, string> = {
   kpi: 'Özet (Cari Alacak/Borç)',
   transactions: 'Son İşlemler',
-  employees: 'Personel Maaş ve Avansları'
+  employees: 'Personel Maaş ve Avansları',
+  finance: 'Kredi ve Çek/Senet Özetleri'
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
   const [widgets, setWidgets] = useState<Record<WidgetKey, boolean>>({
     kpi: true,
     transactions: true,
-    employees: true
+    employees: true,
+    finance: true
   })
   const [mounted, setMounted] = useState(false)
 
@@ -86,16 +93,17 @@ export function DashboardClient({ data }: DashboardClientProps) {
           description="Şirketinizin genel finansal durumu"
         />
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+          <DropdownMenuTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 cursor-pointer">
             <Settings className="w-4 h-4" />
             Özelleştir
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56 bg-card border">
             {Object.entries(WIDGET_NAMES).map(([key, label]) => (
               <DropdownMenuCheckboxItem
                 key={key}
                 checked={widgets[key as WidgetKey]}
                 onCheckedChange={() => toggleWidget(key as WidgetKey)}
+                className="cursor-pointer"
               >
                 {label}
               </DropdownMenuCheckboxItem>
@@ -170,13 +178,13 @@ export function DashboardClient({ data }: DashboardClientProps) {
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">
-                            {tx.account?.name ?? 'Bilinmeyen Cari'}
+                            {tx.account?.name ?? (tx.description || 'Diğer İşlem')}
                           </p>
                           <p className="text-xs text-muted-foreground flex gap-2 mt-1">
                             <span className="font-medium text-foreground/70">{label}</span>
                             <span>&bull;</span>
                             <span>{formatDate(tx.transaction_date)}</span>
-                            {tx.description && (
+                            {tx.description && tx.account && (
                               <>
                                 <span>&bull;</span>
                                 <span className="truncate">{tx.description}</span>
@@ -196,6 +204,48 @@ export function DashboardClient({ data }: DashboardClientProps) {
                   })}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Finance Summary Widget */}
+        {widgets.finance && data.financeSummary && (
+          <Card className="border-border/50 shadow-sm md:col-span-1">
+            <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2 text-primary">
+                <Landmark className="w-4 h-4" />
+                <CardTitle className="text-sm font-semibold">Finansman Durumu</CardTitle>
+              </div>
+              <Link href="/finance">
+                <Button variant="ghost" size="sm" className="h-8 rounded-full text-xs text-primary">
+                  Tümünü Gör
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10">
+                <div>
+                  <span className="text-xs text-muted-foreground block">Kalan Kredi Borcu</span>
+                  <span className="text-lg font-bold text-rose-600">
+                    {formatCurrency(data.financeSummary.totalLoanRemaining)}
+                  </span>
+                </div>
+                <Landmark className="w-8 h-8 text-rose-500/20" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                  <span className="text-xs text-muted-foreground block">Portföydeki Çekler</span>
+                  <span className="text-base font-bold text-emerald-600">
+                    {formatCurrency(data.financeSummary.totalChequesIn)}
+                  </span>
+                </div>
+                <div className="p-4 bg-rose-500/5 rounded-2xl border border-rose-500/10">
+                  <span className="text-xs text-muted-foreground block">Verilen Çekler</span>
+                  <span className="text-base font-bold text-rose-600">
+                    {formatCurrency(data.financeSummary.totalChequesOut)}
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

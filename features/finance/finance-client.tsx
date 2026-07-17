@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { payLoanInstallment } from './actions'
+import { payLoanInstallment, unpayLoanInstallment } from './actions'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +37,19 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
       }
     } catch (e: any) {
       toast.error(e.message || 'Ödeme yapılamadı')
+    }
+  }
+
+  const handleUnpay = async (installmentId: string) => {
+    try {
+      const res = await unpayLoanInstallment(installmentId)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Ödeme başarıyla geri alındı, kasa hareketi silindi!')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'İşlem geri alınamadı')
     }
   }
 
@@ -196,7 +209,16 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
                                   </span>
                                 </td>
                                 <td className="py-3 text-right">
-                                  {inst.status !== 'paid' && (
+                                  {inst.status === 'paid' ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleUnpay(inst.id)}
+                                      className="h-7 text-xs text-rose-500 hover:text-rose-700 hover:bg-rose-500/10 cursor-pointer"
+                                    >
+                                      Geri Al
+                                    </Button>
+                                  ) : (
                                     <DropdownMenu>
                                       <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 px-2.5 cursor-pointer">
                                         Öde

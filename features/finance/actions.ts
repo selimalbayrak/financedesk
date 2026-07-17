@@ -64,6 +64,8 @@ export async function createChequeNote(data: {
         description: description,
         transaction_date: data.issue_date,
         payment_method: data.type === 'cheque' ? 'Çek' : 'Senet',
+        category: transactionType,
+        currency: 'TRY'
       })
 
       if (txError) return { error: `Cari hareket oluşturulamadı: ${txError.message}` }
@@ -78,6 +80,8 @@ export async function createChequeNote(data: {
           description: `${data.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discount_rate}%)`,
           transaction_date: data.issue_date,
           payment_method: 'Nakit',
+          category: 'payment_out',
+          currency: 'TRY'
         })
 
         if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
@@ -214,9 +218,11 @@ export async function payLoanInstallment(installmentId: string, safeId: string) 
       safe_id: safeId,
       transaction_type: 'payment_out',
       amount: inst.amount_due,
-      description: `${bankName} Kredi Taksit Ödemesi`,
+      description: `${bankName} Kredi Taksit Ödemesi (Taksit ID: ${installmentId})`,
       transaction_date: new Date().toISOString().split('T')[0],
       payment_method: 'Havale/EFT',
+      category: 'payment_out',
+      currency: 'TRY'
     })
 
     if (txError) return { error: `Kasa hareketi oluşturulamadı: ${txError.message}` }
@@ -236,6 +242,63 @@ export async function payLoanInstallment(installmentId: string, safeId: string) 
           .eq('id', inst.loan_id)
       }
     }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function unpayLoanInstallment(installmentId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch the installment
+    const { data: inst, error: instFetchErr } = await supabase
+      .from('loan_installments')
+      .select('*, loans(bank_name, id)')
+      .eq('id', installmentId)
+      .single()
+
+    if (instFetchErr || !inst) return { error: 'Taksit bulunamadı.' }
+    if (inst.status !== 'paid') return { error: 'Bu taksit zaten ödenmemiş.' }
+
+    // 2. Revert installment status
+    const { error: updateErr } = await supabase
+      .from('loan_installments')
+      .update({
+        status: 'pending',
+        amount_paid: 0,
+        payment_date: null,
+        safe_id: null
+      })
+      .eq('id', installmentId)
+
+    if (updateErr) return { error: updateErr.message }
+
+    // 3. Delete the transaction associated with this installment payment
+    const txDescription = `${(inst.loans as any)?.bank_name || 'Banka'} Kredi Taksit Ödemesi (Taksit ID: ${installmentId})`
+    
+    const { error: txDeleteErr } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('company_id', companyInfo.id)
+      .eq('description', txDescription)
+
+    if (txDeleteErr) {
+      console.error('Revert transaction error:', txDeleteErr)
+    }
+
+    // 4. Update the loan status back to active
+    await supabase
+      .from('loans')
+      .update({ status: 'active' })
+      .eq('id', inst.loan_id)
 
     revalidatePath('/finance')
     revalidatePath('/')
