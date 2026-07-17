@@ -107,7 +107,7 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
 
         {/* Ledger Tab */}
         <TabsContent value="transactions" className="mt-0">
-          <AccountLedger transactions={transactions as any} accountId={account.id} />
+          <AccountLedger transactions={transactions as any} accountId={account.id} account={account} />
         </TabsContent>
 
         {/* Info Tab */}

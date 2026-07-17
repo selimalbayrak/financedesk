@@ -53,3 +53,34 @@ export const loginSchema = z.object({
 })
 
 export type LoginFormValues = z.infer<typeof loginSchema>
+
+// ─── Employee Schema ──────────────────────────────────────────────────────────
+
+export const employeeSchema = z.object({
+  name: z.string().min(2, 'İsim en az 2 karakter olmalıdır').max(100),
+  role: z.string().max(100).optional().or(z.literal('')),
+  start_date: z.string().optional().or(z.literal('')),
+  wage_type: z.enum(['monthly', 'daily']),
+  wage_amount: z.number().min(0, 'Maaş 0 veya daha büyük olmalıdır'),
+  is_active: z.boolean(),
+})
+
+export type EmployeeFormValues = z.infer<typeof employeeSchema>
+
+export const employeeTransactionSchema = z.object({
+  transaction_type: z.enum(['wage_earning', 'advance_payment', 'salary_payment']),
+  amount: z.number().min(0.01, 'Tutar 0 dan büyük olmalıdır'),
+  date: z.string().min(1, 'Tarih seçmelisiniz'),
+  description: z.string().optional().or(z.literal('')),
+  safe_id: z.string().optional().or(z.literal('')), // Optional for earnings, required for payments
+}).superRefine((data, ctx) => {
+  if ((data.transaction_type === 'advance_payment' || data.transaction_type === 'salary_payment') && (!data.safe_id || data.safe_id === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Ödeme için kasa seçmelisiniz',
+      path: ['safe_id']
+    })
+  }
+})
+
+export type EmployeeTransactionFormValues = z.infer<typeof employeeTransactionSchema>

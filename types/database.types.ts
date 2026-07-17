@@ -32,6 +32,40 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['accounts']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['accounts']['Insert']>
       }
+      employees: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          role: string | null
+          start_date: string | null
+          wage_type: string
+          wage_amount: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['employees']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['employees']['Insert']>
+      }
+      employee_transactions: {
+        Row: {
+          id: string
+          company_id: string
+          employee_id: string
+          safe_id: string | null
+          transaction_type: string
+          amount: number
+          date: string
+          description: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['employee_transactions']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['employee_transactions']['Insert']>
+      }
       safes: {
         Row: {
           id: string
@@ -112,6 +146,21 @@ export interface Database {
           balance: number
         }
       }
+      employee_balances: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          role: string | null
+          start_date: string | null
+          wage_type: string
+          wage_amount: number
+          is_active: boolean
+          total_earned: number
+          total_paid: number
+          balance: number
+        }
+      }
       safe_balances: {
         Row: {
           id: string
@@ -133,15 +182,29 @@ export type Account = Database['public']['Tables']['accounts']['Row']
 export type AccountInsert = Database['public']['Tables']['accounts']['Insert']
 export type AccountUpdate = Database['public']['Tables']['accounts']['Update']
 
-export type Transaction = Database['public']['Tables']['transactions']['Row']
-export type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
+export type Employee = Database['public']['Tables']['employees']['Row']
+export type EmployeeInsert = Database['public']['Tables']['employees']['Insert']
+export type EmployeeUpdate = Database['public']['Tables']['employees']['Update']
 
-export type TransactionLine = Database['public']['Tables']['transaction_lines']['Row']
-export type TransactionLineInsert = Database['public']['Tables']['transaction_lines']['Insert']
+export type EmployeeTransaction = Database['public']['Tables']['employee_transactions']['Row']
+export type EmployeeTransactionInsert = Database['public']['Tables']['employee_transactions']['Insert']
+export type EmployeeTransactionUpdate = Database['public']['Tables']['employee_transactions']['Update']
 
 export type Safe = Database['public']['Tables']['safes']['Row']
 export type SafeInsert = Database['public']['Tables']['safes']['Insert']
 export type SafeUpdate = Database['public']['Tables']['safes']['Update']
+
+export type Transaction = Database['public']['Tables']['transactions']['Row']
+export type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
+export type TransactionUpdate = Database['public']['Tables']['transactions']['Update']
+
+export type TransactionLine = Database['public']['Tables']['transaction_lines']['Row']
+export type TransactionLineInsert = Database['public']['Tables']['transaction_lines']['Insert']
+export type TransactionLineUpdate = Database['public']['Tables']['transaction_lines']['Update']
+
+export type AccountBalance = Database['public']['Views']['account_balances']['Row']
+export type SafeBalance = Database['public']['Views']['safe_balances']['Row']
+export type EmployeeBalance = Database['public']['Views']['employee_balances']['Row']
 
 // Extended types with joins
 export type TransactionWithAccount = Transaction & {

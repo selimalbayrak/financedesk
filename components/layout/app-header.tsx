@@ -22,6 +22,7 @@ const routeLabels: Record<string, string> = {
   checks: 'Checks',
   notes: 'Promissory Notes',
   invoices: 'Invoice Archive',
+  employees: 'Personeller',
 }
 
 export function AppHeader({ companyInfo }: { companyInfo?: any }) {

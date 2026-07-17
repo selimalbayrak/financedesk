@@ -3,8 +3,8 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
-import type { TransactionWithLines } from '@/types/database.types'
-import { ChevronDown, ChevronRight, FileUp, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import type { TransactionWithLines, Account } from '@/types/database.types'
+import { ChevronDown, ChevronRight, FileUp, MoreHorizontal, Pencil, Trash2, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { UploadStatementDialog } from './upload-statement-dialog'
@@ -15,9 +15,10 @@ import { DeleteAllTransactionsDialog } from './delete-all-transactions-dialog'
 interface AccountLedgerProps {
   transactions: TransactionWithLines[]
   accountId: string
+  account: Account
 }
 
-export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
+export function AccountLedger({ transactions, accountId, account }: AccountLedgerProps) {
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
   const [uploadOpen, setUploadOpen] = useState(false)
   
@@ -51,11 +52,42 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 print:hidden">
+        <Button onClick={() => window.print()} size="sm" variant="outline" className="gap-2">
+          <Printer className="h-4 w-4" />
+          Mutabakat Yazdır
+        </Button>
         <Button onClick={() => setDeleteAllOpen(true)} size="sm" variant="destructive" className="gap-2">
           <Trash2 className="h-4 w-4" />
           Tümünü Sil
         </Button>
+      </div>
+
+      {/* Print-only Header (Mutabakat Formu) */}
+      <div className="hidden print:block mb-8">
+        <div className="text-center mb-8 border-b pb-4">
+          <h1 className="text-2xl font-bold">MUTABAKAT MEKTUBU</h1>
+          <p className="text-sm mt-2">Tarih: {new Date().toLocaleDateString('tr-TR')}</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-8 mb-8 text-sm">
+          <div>
+            <h3 className="font-bold underline mb-2">Gönderen / Hazırlayan</h3>
+            <p>FinanceDesk Sistemi</p>
+          </div>
+          <div>
+            <h3 className="font-bold underline mb-2">Alıcı (Cari)</h3>
+            <p className="font-semibold">{account.company_name || account.name}</p>
+            {account.company_name && <p>{account.name}</p>}
+            {account.tax_number && <p>VD / No: {account.tax_office} / {account.tax_number}</p>}
+          </div>
+        </div>
+        
+        <p className="text-sm mb-4">
+          Sayın Yetkili,<br/><br/>
+          Firmanızla olan cari hesap kayıtlarımızın incelenmesi sonucunda {new Date().toLocaleDateString('tr-TR')} tarihi itibarıyla cari hesabınızın hareketleri aşağıda listelenmiştir. 
+          Bakiyede mutabık olup olmadığınızı bildirmenizi rica ederiz.
+        </p>
       </div>
 
       <Card className="border-border/50 shadow-sm">
@@ -63,14 +95,14 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/40 text-muted-foreground text-xs uppercase font-semibold">
               <tr>
-                <th className="px-4 py-3 font-medium"></th>
+                <th className="px-4 py-3 font-medium print:hidden"></th>
                 <th className="px-4 py-3 font-medium">Tarih</th>
                 <th className="px-4 py-3 font-medium">İşlem Türü / Belge</th>
                 <th className="px-4 py-3 font-medium">Açıklama</th>
                 <th className="px-4 py-3 font-medium text-right text-emerald-600 dark:text-emerald-400">Bizim Alacağımız (+)</th>
                 <th className="px-4 py-3 font-medium text-right text-rose-600 dark:text-rose-400">Bizim Borcumuz (-)</th>
                 <th className="px-4 py-3 font-medium text-right">Kalan Bakiye</th>
-                <th className="px-4 py-3 w-10"></th>
+                <th className="px-4 py-3 w-10 print:hidden"></th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -94,7 +126,7 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                   return (
                     <React.Fragment key={tx.id}>
                       <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 w-10">
+                        <td className="px-4 py-3 w-10 print:hidden">
                           {hasLines && (
                             <button
                               onClick={() => toggleRow(tx.id)}
@@ -122,7 +154,7 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
                             {tx.runningBalance >= 0 ? 'Alacak' : 'Borç'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 w-10 print:hidden">
                           <DropdownMenu>
                             <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-accent-foreground h-8 w-8 p-0">
                               <span className="sr-only">Menüyü aç</span>
@@ -185,6 +217,39 @@ export function AccountLedger({ transactions, accountId }: AccountLedgerProps) {
           </table>
         </CardContent>
       </Card>
+
+      {/* Print-only Footer (Mutabakat Formu) */}
+      <div className="hidden print:block mt-16 border-t pt-8">
+        <div className="text-center font-bold text-lg mb-8">
+          Genel Bakiye: {currentBalance === 0 ? 'Bakiyesiz' : currentBalance > 0 ? `${formatCurrency(currentBalance)} (Alacaklıyız)` : `${formatCurrency(Math.abs(currentBalance))} (Borçluyuz)`}
+        </div>
+
+        <div className="grid grid-cols-2 gap-16 text-sm">
+          <div className="border p-4 rounded-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <input type="checkbox" className="w-4 h-4" />
+              <label className="font-bold">MUTABIKIZ</label>
+            </div>
+            <p className="text-xs text-gray-500 mb-8">Yukarıdaki bakiyeyi onaylıyorum.</p>
+            <div className="flex justify-between mt-8">
+              <div>Kaşe:</div>
+              <div>İmza:</div>
+            </div>
+          </div>
+
+          <div className="border p-4 rounded-lg">
+            <div className="flex items-center gap-2 mb-4">
+              <input type="checkbox" className="w-4 h-4" />
+              <label className="font-bold">MUTABIK DEĞİLİZ</label>
+            </div>
+            <p className="text-xs text-gray-500 mb-8">Bizim kayıtlarımıza göre bakiye ..............................................................</p>
+            <div className="flex justify-between mt-8">
+              <div>Kaşe:</div>
+              <div>İmza:</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <UploadStatementDialog 
         open={uploadOpen} 
