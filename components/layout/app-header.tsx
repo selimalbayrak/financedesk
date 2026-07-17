@@ -30,7 +30,7 @@ export function AppHeader({ companyInfo }: { companyInfo?: any }) {
   const segments = pathname.split('/').filter(Boolean)
 
   return (
-    <header className="flex h-14 items-center gap-2 px-4 sticky top-0 z-40 bg-background/80 backdrop-blur-sm lg:max-w-5xl lg:mx-auto lg:w-full">
+    <header className="flex h-14 items-center gap-2 px-4 sticky top-0 z-40 bg-background/80 backdrop-blur-sm lg:max-w-5xl lg:mx-auto lg:w-full print:hidden">
 
 
       <Breadcrumb>

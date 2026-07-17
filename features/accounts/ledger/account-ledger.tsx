@@ -224,26 +224,17 @@ export function AccountLedger({ transactions, accountId, account }: AccountLedge
           Genel Bakiye: {currentBalance === 0 ? 'Bakiyesiz' : currentBalance > 0 ? `${formatCurrency(currentBalance)} (Alacaklıyız)` : `${formatCurrency(Math.abs(currentBalance))} (Borçluyuz)`}
         </div>
 
-        <div className="grid grid-cols-2 gap-16 text-sm">
-          <div className="border p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <input type="checkbox" className="w-4 h-4" />
-              <label className="font-bold">MUTABIKIZ</label>
-            </div>
-            <p className="text-xs text-gray-500 mb-8">Yukarıdaki bakiyeyi onaylıyorum.</p>
-            <div className="flex justify-between mt-8">
+        <div className="flex justify-between text-sm pt-8">
+          <div className="w-64">
+            <h3 className="font-bold mb-8">Mutabakatı Hazırlayan</h3>
+            <div className="flex justify-between">
               <div>Kaşe:</div>
               <div>İmza:</div>
             </div>
           </div>
-
-          <div className="border p-4 rounded-lg">
-            <div className="flex items-center gap-2 mb-4">
-              <input type="checkbox" className="w-4 h-4" />
-              <label className="font-bold">MUTABIK DEĞİLİZ</label>
-            </div>
-            <p className="text-xs text-gray-500 mb-8">Bizim kayıtlarımıza göre bakiye ..............................................................</p>
-            <div className="flex justify-between mt-8">
+          <div className="w-64">
+            <h3 className="font-bold mb-8">Mutabakatı Onaylayan (Cari)</h3>
+            <div className="flex justify-between">
               <div>Kaşe:</div>
               <div>İmza:</div>
             </div>

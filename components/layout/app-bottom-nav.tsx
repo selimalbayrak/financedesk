@@ -10,7 +10,7 @@ export function AppBottomNav() {
   const pathname = usePathname()
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px]">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-[400px] print:hidden">
       <div className="flex items-center justify-between px-8 py-4 rounded-[2.5rem] bg-background/70 backdrop-blur-xl border border-border/50 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.3)]">
         
         {/* Dashboard */}

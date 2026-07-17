@@ -37,7 +37,7 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
   return (
     <>
       {/* Back nav */}
-      <div className="mb-4">
+      <div className="mb-4 print:hidden">
         <Button
           variant="ghost"
           size="sm"
@@ -50,7 +50,7 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
       </div>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
+      <div className="flex items-start justify-between gap-4 mb-6 print:hidden">
         <div>
           <h1 className="text-xl font-semibold">
             {account.company_name || account.name}
@@ -69,7 +69,7 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
       </div>
 
       {/* Balance summary */}
-      <div className="mb-6">
+      <div className="mb-6 print:hidden">
         <Card className="bg-primary/5 border-primary/20 shadow-sm">
           <CardContent className="p-6 text-center">
             <p className="text-sm text-muted-foreground font-medium mb-1">Güncel Bakiye Durumu</p>
@@ -95,8 +95,8 @@ export function AccountDetailView({ account, transactions, companyId }: AccountD
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="transactions">
-        <TabsList className="w-full h-auto p-1 bg-muted/50 rounded-xl mb-4">
+      <Tabs defaultValue="transactions" className="print:block">
+        <TabsList className="w-full h-auto p-1 bg-muted/50 rounded-xl mb-4 print:hidden">
           <TabsTrigger value="transactions" className="flex-1 rounded-lg text-sm py-2">
             İşlem Geçmişi ({transactions.length})
           </TabsTrigger>
