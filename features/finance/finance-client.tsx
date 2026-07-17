@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
+import { toast } from 'sonner'
+import { payLoanInstallment } from './actions'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface FinanceClientProps {
   cheques: any[]
@@ -18,6 +26,19 @@ interface FinanceClientProps {
 
 export function FinanceClient({ cheques, loans, installments, safes }: FinanceClientProps) {
   const [activeTab, setActiveTab] = useState('cheques')
+
+  const handlePay = async (installmentId: string, safeId: string) => {
+    try {
+      const res = await payLoanInstallment(installmentId, safeId)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Taksit başarıyla ödendi ve kasa hareketi oluşturuldu!')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Ödeme yapılamadı')
+    }
+  }
 
   return (
     <div className="space-y-6 pb-24 animate-in-up">
@@ -72,7 +93,8 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
                         cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {cheque.status}
+                        {cheque.status === 'portfolio' ? 'Portföyde' :
+                         cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
                       </span>
                     </CardTitle>
                   </CardHeader>
@@ -175,7 +197,21 @@ export function FinanceClient({ cheques, loans, installments, safes }: FinanceCl
                                 </td>
                                 <td className="py-3 text-right">
                                   {inst.status !== 'paid' && (
-                                    <Button size="sm" variant="outline" className="h-7 text-xs">Öde</Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 px-2.5 cursor-pointer">
+                                        Öde
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-48 bg-card border">
+                                        <div className="px-2 py-1.5 text-xs text-muted-foreground font-semibold border-b">
+                                          Ödenecek Kasa/Banka:
+                                        </div>
+                                        {safes.map(safe => (
+                                          <DropdownMenuItem key={safe.id} onClick={() => handlePay(inst.id, safe.id)} className="cursor-pointer">
+                                            {safe.name} ile Öde
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   )}
                                 </td>
                               </tr>

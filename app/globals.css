@@ -54,25 +54,25 @@
 }
 
 :root {
-  /* Playful, warm, soft background */
-  --background: oklch(0.98 0.03 95); /* Soft creamy yellow/beige */
-  --foreground: oklch(0.2 0.05 40); /* Warm dark brown/gray */
+  /* Professional, clean blue theme */
+  --background: oklch(0.98 0.01 240); /* Very soft blue-tinted white */
+  --foreground: oklch(0.2 0.05 250); /* Dark slate blue/gray */
   --card: oklch(1 0 0); /* Pure white cards */
-  --card-foreground: oklch(0.2 0.05 40);
+  --card-foreground: oklch(0.2 0.05 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.05 40);
-  --primary: oklch(0.65 0.2 20); /* Playful warm coral/orange */
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.92 0.1 80); /* Soft peach/yellow */
-  --secondary-foreground: oklch(0.3 0.1 40);
-  --muted: oklch(0.95 0.02 90);
-  --muted-foreground: oklch(0.5 0.05 60);
-  --accent: oklch(0.92 0.08 300); /* Soft lavender/purple accent */
-  --accent-foreground: oklch(0.3 0.1 300);
+  --popover-foreground: oklch(0.2 0.05 250);
+  --primary: oklch(0.55 0.15 250); /* Strong professional blue */
+  --primary-foreground: oklch(0.98 0.01 240);
+  --secondary: oklch(0.95 0.03 240); /* Soft blue-gray */
+  --secondary-foreground: oklch(0.3 0.05 250);
+  --muted: oklch(0.96 0.01 240);
+  --muted-foreground: oklch(0.5 0.05 250);
+  --accent: oklch(0.92 0.05 260); /* Soft indigo accent */
+  --accent-foreground: oklch(0.3 0.1 260);
   --destructive: oklch(0.6 0.2 20);
-  --border: oklch(0.9 0.05 90); /* Warmer border */
-  --input: oklch(0.9 0.05 90);
-  --ring: oklch(0.65 0.2 20 / 40%);
+  --border: oklch(0.9 0.03 240); 
+  --input: oklch(0.9 0.03 240);
+  --ring: oklch(0.55 0.15 250 / 40%);
   /* Financial semantic colors */
   --success: oklch(0.65 0.15 150); /* Friendly green */
   --success-foreground: oklch(1 0 0);
@@ -84,37 +84,37 @@
   --chart-3: oklch(0.7 0.15 300);
   --chart-4: oklch(0.75 0.2 70);
   --chart-5: oklch(0.6 0.15 200);
-  --radius: 2rem; /* VERY rounded, pill-like, childish */
+  --radius: 1rem; /* More professional, slightly rounded */
   /* Sidebar */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.3 0.05 40);
-  --sidebar-primary: oklch(0.65 0.2 20);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0.05 90);
-  --sidebar-accent-foreground: oklch(0.3 0.1 40);
-  --sidebar-border: oklch(0.9 0.05 90);
-  --sidebar-ring: oklch(0.65 0.2 20 / 30%);
+  --sidebar: oklch(0.98 0.01 240);
+  --sidebar-foreground: oklch(0.3 0.05 250);
+  --sidebar-primary: oklch(0.55 0.15 250);
+  --sidebar-primary-foreground: oklch(0.98 0.01 240);
+  --sidebar-accent: oklch(0.94 0.03 240);
+  --sidebar-accent-foreground: oklch(0.3 0.1 250);
+  --sidebar-border: oklch(0.9 0.03 240);
+  --sidebar-ring: oklch(0.55 0.15 250 / 30%);
 }
 
 .dark {
-  --background: oklch(0.18 0.03 40);
-  --foreground: oklch(0.95 0.03 95);
-  --card: oklch(0.22 0.03 40);
-  --card-foreground: oklch(0.95 0.03 95);
-  --popover: oklch(0.22 0.03 40);
-  --popover-foreground: oklch(0.95 0.03 95);
-  --primary: oklch(0.7 0.2 30);
-  --primary-foreground: oklch(0.1 0.05 40);
-  --secondary: oklch(0.3 0.05 40);
-  --secondary-foreground: oklch(0.95 0.05 90);
-  --muted: oklch(0.3 0.05 40);
-  --muted-foreground: oklch(0.7 0.05 60);
-  --accent: oklch(0.35 0.1 300);
-  --accent-foreground: oklch(0.95 0.05 300);
+  --background: oklch(0.18 0.02 250); /* Deep blue-slate background */
+  --foreground: oklch(0.95 0.01 240);
+  --card: oklch(0.22 0.02 250);
+  --card-foreground: oklch(0.95 0.01 240);
+  --popover: oklch(0.22 0.02 250);
+  --popover-foreground: oklch(0.95 0.01 240);
+  --primary: oklch(0.65 0.15 250); /* Bright blue primary for dark mode */
+  --primary-foreground: oklch(0.1 0.02 250);
+  --secondary: oklch(0.3 0.03 250);
+  --secondary-foreground: oklch(0.95 0.02 240);
+  --muted: oklch(0.28 0.02 250);
+  --muted-foreground: oklch(0.7 0.02 250);
+  --accent: oklch(0.35 0.08 260);
+  --accent-foreground: oklch(0.95 0.03 260);
   --destructive: oklch(0.65 0.2 20);
-  --border: oklch(0.3 0.05 40);
-  --input: oklch(0.3 0.05 40);
-  --ring: oklch(0.7 0.2 30 / 40%);
+  --border: oklch(0.3 0.03 250);
+  --input: oklch(0.3 0.03 250);
+  --ring: oklch(0.65 0.15 250 / 40%);
   /* Financial semantic colors dark */
   --success: oklch(0.7 0.15 150);
   --success-foreground: oklch(0.15 0.02 220);
@@ -127,14 +127,14 @@
   --chart-4: oklch(0.8 0.2 70);
   --chart-5: oklch(0.65 0.15 200);
   /* Sidebar dark */
-  --sidebar: oklch(0.22 0.03 40);
-  --sidebar-foreground: oklch(0.95 0.03 95);
-  --sidebar-primary: oklch(0.7 0.2 30);
-  --sidebar-primary-foreground: oklch(0.1 0.05 40);
-  --sidebar-accent: oklch(0.3 0.05 40);
-  --sidebar-accent-foreground: oklch(0.95 0.05 90);
-  --sidebar-border: oklch(0.3 0.05 40);
-  --sidebar-ring: oklch(0.7 0.2 30 / 30%);
+  --sidebar: oklch(0.2 0.02 250);
+  --sidebar-foreground: oklch(0.95 0.01 240);
+  --sidebar-primary: oklch(0.65 0.15 250);
+  --sidebar-primary-foreground: oklch(0.1 0.02 250);
+  --sidebar-accent: oklch(0.28 0.03 250);
+  --sidebar-accent-foreground: oklch(0.95 0.02 250);
+  --sidebar-border: oklch(0.3 0.03 250);
+  --sidebar-ring: oklch(0.65 0.15 250 / 30%);
 }
 
 @layer base {
