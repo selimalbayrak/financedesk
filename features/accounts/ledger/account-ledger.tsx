@@ -94,9 +94,9 @@ export function AccountLedger({ transactions, accountId, companyId, companyName,
         </p>
       </div>
 
-      <Card className="border-border/50 shadow-sm">
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm text-left">
+      <Card className="border-border/50 shadow-sm print:border-none print:shadow-none print:bg-transparent">
+        <CardContent className="p-0 overflow-x-auto print:overflow-visible">
+          <table className="w-full text-sm text-left print:text-xs">
             <thead className="bg-muted/40 text-muted-foreground text-xs uppercase font-semibold">
               <tr>
                 <th className="px-4 py-3 font-medium print:hidden"></th>
@@ -154,7 +154,7 @@ export function AccountLedger({ transactions, accountId, companyId, companyName,
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums font-semibold">
                           {formatCurrency(Math.abs(tx.runningBalance))}
-                          <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded-sm ${tx.runningBalance >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30'}`}>
+                          <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded-sm print:hidden ${tx.runningBalance >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30'}`}>
                             {tx.runningBalance >= 0 ? 'Alacak' : 'Borç'}
                           </span>
                         </td>

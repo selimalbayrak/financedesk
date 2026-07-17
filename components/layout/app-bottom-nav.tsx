@@ -32,7 +32,7 @@ export function AppBottomNav() {
             pathname.startsWith('/accounts') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
           )}
         >
-          <Users className="w-7 h-7 stroke-[2.5]" />
+          <Briefcase className="w-7 h-7 stroke-[2.5]" />
         </Link>
 
         {/* Floating FAB */}
@@ -66,7 +66,7 @@ export function AppBottomNav() {
             pathname.startsWith('/employees') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
           )}
         >
-          <Briefcase className="w-7 h-7 stroke-[2.5]" />
+          <Users className="w-7 h-7 stroke-[2.5]" />
         </Link>
 
         {/* Transactions (History) */}

@@ -20,3 +20,9 @@ export async function switchCompany(companyId: string) {
   revalidatePath('/', 'layout')
   redirect('/')
 }
+
+export async function updateCompanyName(companyId: string, newName: string) {
+  const supabase = await createClient()
+  await supabase.from('companies').update({ name: newName }).eq('id', companyId)
+  revalidatePath('/', 'layout')
+}

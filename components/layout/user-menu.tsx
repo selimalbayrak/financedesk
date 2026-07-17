@@ -9,10 +9,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { logout, switchCompany } from '@/app/actions'
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
+import { CompanyEditDialog } from '../company/company-edit-dialog'
+import { Pencil } from 'lucide-react'
 
 export function UserMenu({ companyInfo }: { companyInfo?: any }) {
   const [isPending, startTransition] = useTransition()
+  const [editCompanyId, setEditCompanyId] = useState<string | null>(null)
 
   return (
     <DropdownMenu>
@@ -43,7 +46,22 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
               >
                 <Building className="mr-2 h-4 w-4" />
                 <span className="flex-1 truncate">{c.name}</span>
-                {c.id === companyInfo.id && <Check className="ml-2 h-4 w-4" />}
+                {c.id === companyInfo.id && (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 p-0 hover:bg-background/20"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditCompanyId(c.id)
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Check className="h-4 w-4" />
+                  </div>
+                )}
               </DropdownMenuItem>
             ))}
           </>
@@ -64,6 +82,14 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
           <span>Çıkış Yap</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
+      {editCompanyId && companyInfo && (
+        <CompanyEditDialog
+          open={!!editCompanyId}
+          onOpenChange={(open) => !open && setEditCompanyId(null)}
+          companyId={editCompanyId}
+          currentName={companyInfo.allCompanies.find((c: any) => c.id === editCompanyId)?.name || ''}
+        />
+      )}
     </DropdownMenu>
   )
 }
