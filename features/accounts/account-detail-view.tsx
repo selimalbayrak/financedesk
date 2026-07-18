@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard } from 'lucide-react'
+import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -75,10 +75,18 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
             <AccountTypeBadge type={account.type} />
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-          <Pencil className="mr-1.5 h-4 w-4" />
-          Düzenle
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/transactions/import">
+            <Button size="sm" variant="outline" className="rounded-xl">
+              <Upload className="mr-1.5 h-4 w-4" />
+              PDF'den Aktar
+            </Button>
+          </Link>
+          <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="rounded-xl">
+            <Pencil className="mr-1.5 h-4 w-4" />
+            Düzenle
+          </Button>
+        </div>
       </div>
 
       {/* Balance summary */}

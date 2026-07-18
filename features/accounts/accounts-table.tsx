@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ColumnDef } from '@tanstack/react-table'
-import { MoreHorizontal, Plus, ArrowUpDown, Pencil, Trash2, Eye } from 'lucide-react'
+import { MoreHorizontal, Plus, ArrowUpDown, Pencil, Trash2, Eye, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -179,14 +179,23 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
         title="Cari Hesaplar"
         description="Müşteri ve tedarikçilerinizi yönetin"
         actions={
-          <Button
-            size="sm"
-            onClick={() => { setEditAccount(null); setFormOpen(true) }}
-            id="new-account-btn"
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            Yeni Cari Ekle
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/transactions/import">
+              <Button variant="outline" size="sm" className="rounded-xl">
+                <Upload className="mr-1.5 h-4 w-4" />
+                PDF'den Aktar
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              onClick={() => { setEditAccount(null); setFormOpen(true) }}
+              id="new-account-btn"
+              className="rounded-xl"
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Yeni Cari Ekle
+            </Button>
+          </div>
         }
       />
 

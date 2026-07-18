@@ -22,7 +22,8 @@ export default async function FinancePage() {
     { data: loans },
     { data: installments },
     { data: safes },
-    { data: accounts }
+    { data: accounts },
+    { data: expenses }
   ] = await Promise.all([
     supabase
       .from('cheques_notes')
@@ -52,7 +53,12 @@ export default async function FinancePage() {
       .select('id, name, company_name')
       .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
-      .order('name')
+      .order('name'),
+    supabase
+      .from('factory_expenses')
+      .select('*')
+      .eq('company_id', companyInfo.id)
+      .order('due_date', { ascending: true })
   ])
 
   return (
@@ -62,6 +68,8 @@ export default async function FinancePage() {
       installments={installments ?? []}
       safes={safes ?? []}
       accounts={accounts ?? []}
+      expenses={expenses ?? []}
+      companyName={companyInfo.name}
     />
   )
 }

@@ -423,3 +423,107 @@ export async function cashChequeNote(data: {
     return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
   }
 }
+
+export async function createFactoryExpense(data: {
+  expense_type: string
+  amount: number // in cents
+  due_date: string
+  description?: string
+}) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase.from('factory_expenses').insert({
+      company_id: companyInfo.id,
+      expense_type: data.expense_type,
+      amount: data.amount,
+      due_date: data.due_date,
+      status: 'unpaid',
+      description: data.description || null
+    })
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function payFactoryExpense(expenseId: string, safeId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch expense details
+    const { data: expense, error: fetchErr } = await supabase
+      .from('factory_expenses')
+      .select('*')
+      .eq('id', expenseId)
+      .eq('company_id', companyInfo.id)
+      .single()
+
+    if (fetchErr || !expense) return { error: 'Gider kaydı bulunamadı.' }
+    if (expense.status === 'paid') return { error: 'Bu gider zaten ödenmiş.' }
+
+    const today = new Date().toISOString().split('T')[0]
+
+    // 2. Create transaction first
+    const { error: txError } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      safe_id: safeId,
+      transaction_type: 'payment_out',
+      amount: expense.amount,
+      description: `Fabrika Gideri: ${expense.expense_type} (${expense.description || ''})`,
+      transaction_date: today,
+      payment_method: 'Havale/EFT',
+      category: 'payment_out',
+      currency: 'TRY'
+    })
+
+    if (txError) return { error: `Gider ödemesi kasa kaydı oluşturulamadı: ${txError.message}` }
+
+    // 3. Update expense status
+    const { error: updateErr } = await supabase
+      .from('factory_expenses')
+      .update({
+        status: 'paid',
+        paid_date: today,
+        safe_id: safeId
+      })
+      .eq('id', expenseId)
+      .eq('company_id', companyInfo.id)
+
+    if (updateErr) return { error: `Gider durumu güncellenemedi: ${updateErr.message}` }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function deleteFactoryExpense(expenseId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('factory_expenses')
+      .delete()
+      .eq('id', expenseId)
+      .eq('company_id', companyInfo.id)
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}

@@ -56,6 +56,7 @@ export default async function EmployeeDetailPage({ params }: EmployeeDetailPageP
       transactions={transactions ?? []}
       safes={safesRaw ?? []}
       companyId={companyInfo.id}
+      companyName={companyInfo.name}
     />
   )
 }
