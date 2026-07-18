@@ -38,28 +38,14 @@ export async function createNewCompany(name: string) {
     return { error: 'Yeni şirket oluşturma yetkiniz bulunmamaktadır (Yalnızca albayrakselim9@gmail.com).' }
   }
 
-  // Insert company
-  const { data: company, error: compErr } = await supabase
-    .from('companies')
-    .insert({ name })
-    .select('id')
-    .single()
+  // Insert company & owner via RPC (handles RLS select timing issues atomically)
+  const { data: companyId, error: compErr } = await supabase
+    .rpc('create_company_and_owner', { p_name: name })
 
-  if (compErr || !company) return { error: `Şirket oluşturulamadı: ${compErr.message}` }
-
-  // Insert company_user link as owner
-  const { error: linkErr } = await supabase
-    .from('company_users')
-    .insert({
-      company_id: company.id,
-      user_id: user.id,
-      role: 'owner'
-    })
-
-  if (linkErr) return { error: `Şirket yetkilendirmesi başarısız: ${linkErr.message}` }
+  if (compErr || !companyId) return { error: `Şirket oluşturulamadı: ${compErr?.message || 'Bilinmeyen Hata'}` }
 
   // Switch to the newly created company
-  await switchCompany(company.id)
+  await switchCompany(companyId)
   return { success: true }
 }
 
