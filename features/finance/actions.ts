@@ -360,20 +360,23 @@ export async function cashChequeNote(data: {
     if (updateErr) return { error: updateErr.message }
 
     // 3. Create transactions
-    // Transaction 1: Net Amount goes into the Safe
+    // Transaction 1: Money entering safe (for direction === in) or leaving safe (for direction === out)
+    const isIncoming = cheque.direction === 'in'
     const { error: txError } = await supabase.from('transactions').insert({
       company_id: companyInfo.id,
       safe_id: data.safeId,
-      transaction_type: 'payment_in',
-      amount: netAmount,
-      description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı (Net Tutar)`,
+      transaction_type: isIncoming ? 'payment_in' : 'payment_out',
+      amount: isIncoming ? netAmount : cheque.amount,
+      description: isIncoming 
+        ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı (Net Tutar)`
+        : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Ödemesi (Kasadan Çıkış)`,
       transaction_date: today.toISOString().split('T')[0],
       payment_method: 'Havale/EFT',
-      category: 'payment_in',
+      category: isIncoming ? 'payment_in' : 'payment_out',
       currency: 'TRY'
     })
 
-    if (txError) return { error: `Tahsilat kaydı oluşturulamadı: ${txError.message}` }
+    if (txError) return { error: `${isIncoming ? 'Tahsilat' : 'Ödeme'} kaydı oluşturulamadı: ${txError.message}` }
 
     // Transaction 2: If there's a discount expense
     if (data.applyDiscount && discountAmount > 0) {

@@ -175,7 +175,7 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
                       </div>
                     </CardContent>
                   </div>
-                  {cheque.status === 'portfolio' && cheque.direction === 'in' && (
+                  {cheque.status === 'portfolio' && (
                     <div className="p-4 pt-0 border-t mt-auto flex justify-end">
                       <Button
                         size="sm"
@@ -184,9 +184,9 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
                           setSelectedCheque(cheque)
                           setCashModalOpen(true)
                         }}
-                        className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full"
+                        className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full text-primary hover:bg-primary/5"
                       >
-                        Tahsil Et (Nakit Girişi / Kırdır)
+                        {cheque.direction === 'in' ? 'Tahsil Et (Nakit Girişi / Kırdır)' : 'Ödendi İşaretle (Kasadan Düş)'}
                       </Button>
                     </div>
                   )}

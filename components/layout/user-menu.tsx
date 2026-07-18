@@ -1,6 +1,6 @@
 'use client'
 
-import { User, LogOut, Building, Check } from 'lucide-react'
+import { User, LogOut, Building, Check, Pencil, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,7 +11,7 @@ import {
 import { logout, switchCompany } from '@/app/actions'
 import { useState, useTransition } from 'react'
 import { CompanyEditDialog } from '../company/company-edit-dialog'
-import { Pencil } from 'lucide-react'
+import Link from 'next/link'
 
 export function UserMenu({ companyInfo }: { companyInfo?: any }) {
   const [isPending, startTransition] = useTransition()
@@ -24,8 +24,15 @@ export function UserMenu({ companyInfo }: { companyInfo?: any }) {
           <User className="h-5 w-5" />
         </Button>
       } />
-      <DropdownMenuContent align="end" className="w-64">
-        <div className="px-2 py-1.5 text-sm font-semibold text-foreground">Hesabım</div>
+      <DropdownMenuContent align="end" className="w-64 bg-card border shadow-lg rounded-2xl p-1.5">
+        <div className="px-2.5 py-2 text-sm font-bold text-foreground">Hesabım</div>
+        
+        <Link href="/settings">
+          <DropdownMenuItem className="cursor-pointer rounded-xl">
+            <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
+            <span>Profil ve Şirket Ayarları</span>
+          </DropdownMenuItem>
+        </Link>
         
         {companyInfo && companyInfo.allCompanies && companyInfo.allCompanies.length > 0 && (
           <>
