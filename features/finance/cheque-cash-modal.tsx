@@ -43,7 +43,14 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
   const [loading, setLoading] = useState(false)
   const [safeId, setSafeId] = useState('')
   const [applyDiscount, setApplyDiscount] = useState(false)
+  
+  // Cost breakdown states (in TL strings)
+  const [calcInterestByRate, setCalcInterestByRate] = useState(true)
   const [discountRate, setDiscountRate] = useState('6') // Monthly %
+  const [interestVal, setInterestVal] = useState('0.00')
+  const [commissionVal, setCommissionVal] = useState('0.00')
+  const [bankExpenseVal, setBankExpenseVal] = useState('0.00')
+
   const [expenseTarget, setExpenseTarget] = useState<'safe' | 'account'>('safe')
   const [expenseTargetId, setExpenseTargetId] = useState('')
 
@@ -57,7 +64,6 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
   // Set default values when cheque changes
   useEffect(() => {
     if (cheque) {
-      // Set default safe
       if (safes.length > 0) {
         setSafeId(safes[0].id)
       }
@@ -72,6 +78,10 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
       setRemainingDays(diffDays)
 
       setApplyDiscount(false) // Default to false, let user check it
+      setCalcInterestByRate(true)
+      setInterestVal('0.00')
+      setCommissionVal('0.00')
+      setBankExpenseVal('0.00')
 
       // Reset target
       setExpenseTarget('safe')
@@ -83,21 +93,33 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
     }
   }, [cheque, safes])
 
-  // Recalculate discount
+  // Recalculate interest amount based on rate if checked
   useEffect(() => {
-    if (cheque && applyDiscount && discountRate) {
+    if (cheque && applyDiscount && calcInterestByRate && discountRate) {
       const monthlyRate = parseFloat(discountRate) / 100
       const dailyRate = monthlyRate / 30
       const calcDiscount = cheque.amount * dailyRate * remainingDays
-      setDiscountAmount(Math.round(calcDiscount))
-      setNetAmount(Math.round(cheque.amount - calcDiscount))
+      setInterestVal((calcDiscount / 100).toFixed(2))
+    }
+  }, [cheque, applyDiscount, calcInterestByRate, discountRate, remainingDays])
+
+  // Compute total discount sum and net amount
+  useEffect(() => {
+    if (cheque && applyDiscount) {
+      const faiz = parseFloat(interestVal) || 0
+      const komisyon = parseFloat(commissionVal) || 0
+      const masraf = parseFloat(bankExpenseVal) || 0
+      const totalTL = faiz + komisyon + masraf
+      const totalCents = Math.round(totalTL * 100)
+      setDiscountAmount(totalCents)
+      setNetAmount(Math.max(0, cheque.amount - totalCents))
     } else if (cheque) {
       setDiscountAmount(0)
       setNetAmount(cheque.amount)
     }
-  }, [cheque, applyDiscount, discountRate, remainingDays])
+  }, [cheque, applyDiscount, interestVal, commissionVal, bankExpenseVal])
 
-  // Sync expenseTargetId when target changes
+  // Sync expenseTargetId when target or safe changes
   useEffect(() => {
     if (cheque) {
       if (expenseTarget === 'account') {
@@ -124,7 +146,9 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
         chequeId: cheque.id,
         safeId: safeId,
         applyDiscount: applyDiscount,
-        discountRate: applyDiscount ? parseFloat(discountRate) : undefined,
+        interestAmount: applyDiscount ? Math.round((parseFloat(interestVal) || 0) * 100) : 0,
+        commissionAmount: applyDiscount ? Math.round((parseFloat(commissionVal) || 0) * 100) : 0,
+        bankExpenseAmount: applyDiscount ? Math.round((parseFloat(bankExpenseVal) || 0) * 100) : 0,
         expenseTarget: applyDiscount ? expenseTarget : undefined,
         expenseTargetId: applyDiscount ? expenseTargetId : undefined,
       })
@@ -145,6 +169,15 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
       setLoading(false)
     }
   }
+
+  // Helper selectors for correct naming instead of showing raw UUIDs
+  const selectedSafeName = safes.find(s => s.id === safeId)?.name || 'Kasa/Banka seçin'
+  const selectedExpenseTargetSafeName = safes.find(s => s.id === expenseTargetId)?.name || 'Kasa seçin'
+  
+  const currentAccount = accounts.find(a => a.id === expenseTargetId)
+  const selectedExpenseTargetAccountName = currentAccount 
+    ? `${currentAccount.name} ${currentAccount.company_name ? `(${currentAccount.company_name})` : ''}`
+    : 'Cari hesap seçin'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -172,7 +205,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
             </Label>
             <Select value={safeId} onValueChange={(val) => setSafeId(val || '')} required>
               <SelectTrigger className="h-10 rounded-lg">
-                <SelectValue placeholder="Kasa/Banka seçin" />
+                <SelectValue>{selectedSafeName}</SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-card border">
                 {safes.map(s => (
@@ -196,28 +229,104 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
           </div>
 
           {applyDiscount && (
-            <div className="space-y-4 animate-in-up">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3 animate-in-up text-xs">
+              {/* Cost Categories Section */}
+              <div className="bg-muted/30 p-3 rounded-2xl border space-y-3">
+                <p className="font-semibold text-sm border-b pb-1 text-primary">Kırdırma Masrafları</p>
+                
+                {/* 1. İskonto Faizi */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">1. İskonto Faizi (TL)</Label>
+                    <div className="flex items-center gap-1">
+                      <input 
+                        type="checkbox" 
+                        id="calcInterestByRate"
+                        checked={calcInterestByRate}
+                        onChange={(e) => setCalcInterestByRate(e.target.checked)}
+                        className="w-3.5 h-3.5 cursor-pointer rounded"
+                      />
+                      <label htmlFor="calcInterestByRate" className="text-[10px] text-muted-foreground cursor-pointer">
+                        Orana Göre Otomatik Hesapla
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {calcInterestByRate ? (
+                    <div className="grid grid-cols-3 gap-2 items-center">
+                      <div className="col-span-1">
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          value={discountRate} 
+                          onChange={(e) => setDiscountRate(e.target.value)} 
+                          className="h-8 text-xs rounded-lg"
+                          placeholder="Aylık %"
+                        />
+                      </div>
+                      <span className="text-[10px] text-center text-muted-foreground">Aylık Faiz Oranı (%)</span>
+                      <div className="col-span-1 text-right">
+                        <Input 
+                          type="text" 
+                          value={interestVal} 
+                          disabled
+                          className="h-8 text-xs rounded-lg text-right bg-muted"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      value={interestVal} 
+                      onChange={(e) => setInterestVal(e.target.value)} 
+                      className="h-9 text-xs rounded-lg"
+                      placeholder="Faiz Tutarı (TL)"
+                    />
+                  )}
+                </div>
+
+                {/* 2. Komisyon */}
                 <div className="space-y-1">
-                  <Label className="text-xs">Aylık Faiz Oranı (%)</Label>
+                  <Label className="text-xs font-medium">2. Komisyon / Hizmet Bedeli (TL)</Label>
                   <Input 
                     type="number" 
                     step="0.01" 
-                    value={discountRate} 
-                    onChange={(e) => setDiscountRate(e.target.value)} 
-                    className="h-10 rounded-lg"
+                    value={commissionVal} 
+                    onChange={(e) => setCommissionVal(e.target.value)} 
+                    className="h-9 text-xs rounded-lg"
+                    placeholder="Komisyon Tutarı"
                   />
                 </div>
+
+                {/* 3. Banka Masrafları */}
                 <div className="space-y-1">
-                  <Label className="text-xs">
-                    {isIncoming ? 'Masraf Yansıtma Hedefi' : 'İndirim/Gelir Yansıtma Hedefi'}
-                  </Label>
+                  <Label className="text-xs font-medium">3. Banka Masrafları / Dosya Ücreti (TL)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={bankExpenseVal} 
+                    onChange={(e) => setBankExpenseVal(e.target.value)} 
+                    className="h-9 text-xs rounded-lg"
+                    placeholder="Diğer Masraflar"
+                  />
+                </div>
+              </div>
+
+              {/* Expense/Income Target selector */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Masrafın Düştüğü Hedef</Label>
                   <Select 
                     value={expenseTarget} 
                     onValueChange={(val: any) => setExpenseTarget(val)}
                   >
                     <SelectTrigger className="h-10 rounded-lg">
-                      <SelectValue />
+                      <SelectValue>
+                        {expenseTarget === 'safe' 
+                          ? (isIncoming ? 'Kasa Gideri Yaz' : 'Kasa Geliri Yaz')
+                          : (isIncoming ? 'Cariye Yansıt (Borçlandır)' : 'Cariye Yansıt (Alacaklandır)')}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-card border">
                       <SelectItem value="safe">
@@ -229,57 +338,54 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                     </SelectContent>
                   </Select>
                 </div>
+
+                {expenseTarget === 'account' ? (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Masrafın Yansıtılacağı Cari</Label>
+                    <Select 
+                      value={expenseTargetId} 
+                      onValueChange={(val) => setExpenseTargetId(val || '')}
+                    >
+                      <SelectTrigger className="h-10 rounded-lg">
+                        <SelectValue>{selectedExpenseTargetAccountName}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border">
+                        {accounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} {acc.company_name ? `(${acc.company_name})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Masrafın Düştüğü Kasa</Label>
+                    <Select 
+                      value={expenseTargetId} 
+                      onValueChange={(val) => setExpenseTargetId(val || '')}
+                    >
+                      <SelectTrigger className="h-10 rounded-lg">
+                        <SelectValue>{selectedExpenseTargetSafeName}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border">
+                        {safes.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
-              {expenseTarget === 'account' ? (
-                <div className="space-y-1">
-                  <Label className="text-xs">
-                    {isIncoming ? 'Masrafın Yansıtılacağı Cari Hesap' : 'Gelirin Yansıtılacağı Cari Hesap'}
-                  </Label>
-                  <Select 
-                    value={expenseTargetId} 
-                    onValueChange={(val) => setExpenseTargetId(val || '')}
-                  >
-                    <SelectTrigger className="h-10 rounded-lg">
-                      <SelectValue placeholder="Cari hesap seçin" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border">
-                      {accounts.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          {acc.name} {acc.company_name ? `(${acc.company_name})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs">
-                    {isIncoming ? 'Masrafın Düşeceği Kasa' : 'Gelirin Ekleneceği Kasa'}
-                  </Label>
-                  <Select 
-                    value={expenseTargetId} 
-                    onValueChange={(val) => setExpenseTargetId(val || '')}
-                  >
-                    <SelectTrigger className="h-10 rounded-lg">
-                      <SelectValue placeholder="Kasa seçin" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border">
-                      {safes.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
+              {/* Live calculations */}
               <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 grid grid-cols-3 gap-2 text-center text-xs font-mono">
                 <div>
                   <span className="text-muted-foreground block text-[10px]">Vadeye Kalan:</span>
                   <strong className="text-xs">{remainingDays} Gün</strong>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block text-[10px]">Vade Farkı:</span>
+                  <span className="text-muted-foreground block text-[10px]">Toplam Masraf:</span>
                   <strong className={`text-xs ${isIncoming ? 'text-rose-500' : 'text-emerald-500'}`}>
                     {formatCurrency(discountAmount)}
                   </strong>

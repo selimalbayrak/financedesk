@@ -71,7 +71,7 @@ export default async function TransactionsPage() {
                 </div>
                 <div>
                   <div className="font-semibold text-sm">
-                    {t.transaction_type === 'safe_transfer' ? 'Kasalar Arası Transfer' : (t.account?.name || 'Bilinmiyor')}
+                    {t.transaction_type === 'safe_transfer' ? 'Kasalar Arası Transfer' : (t.account?.name || t.description || 'Diğer İşlem')}
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-2">
                     <span>{new Date(t.transaction_date).toLocaleDateString('tr-TR')}</span>

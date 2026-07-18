@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { PageHeader } from '@/components/shared/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X } from 'lucide-react'
+import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -17,6 +17,7 @@ import {
   unpayLoanInstallment, 
   createFactoryExpense, 
   payFactoryExpense, 
+  payRecurringFactoryExpense,
   deleteFactoryExpense 
 } from './actions'
 import { ChequeCashModal } from './cheque-cash-modal'
@@ -25,6 +26,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal
 } from '@/components/ui/dropdown-menu'
 
 interface FinanceClientProps {
@@ -61,6 +66,29 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseDueDate, setExpenseDueDate] = useState(new Date().toISOString().split('T')[0])
   const [expenseDescription, setExpenseDescription] = useState('')
+
+  // Recurring expense fields
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurrenceDay, setRecurrenceDay] = useState('10')
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [attachmentUrl, setAttachmentUrl] = useState('')
+
+  // Utility to calculate unpaid months for recurring expense
+  const getRecurringUnpaidMonths = (startDateStr: string, recurrenceDayVal: number, monthsPaidVal: number) => {
+    if (!startDateStr) return 0
+    const start = new Date(startDateStr)
+    const today = new Date()
+    
+    let yearDiff = today.getFullYear() - start.getFullYear()
+    let monthDiff = today.getMonth() - start.getMonth()
+    let totalMonths = yearDiff * 12 + monthDiff + 1 // start month is due
+    
+    if (today.getDate() < recurrenceDayVal) {
+      totalMonths -= 1
+    }
+    
+    return Math.max(0, totalMonths - (monthsPaidVal || 0))
+  }
 
   const handlePay = async (installmentId: string, safeId: string) => {
     try {
@@ -99,17 +127,24 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     startTransition(async () => {
       const res = await createFactoryExpense({
         expense_type: expenseType,
-        amount: Math.round(parseFloat(expenseAmount) * 100), // convert to cents
-        due_date: expenseDueDate,
-        description: expenseDescription
+        amount: isRecurring ? 0 : Math.round(parseFloat(expenseAmount) * 100), // convert to cents
+        due_date: isRecurring ? undefined : expenseDueDate,
+        description: expenseDescription,
+        is_recurring: isRecurring,
+        recurrence_day: isRecurring ? parseInt(recurrenceDay) : undefined,
+        start_date: isRecurring ? startDate : undefined,
+        monthly_amount: isRecurring ? Math.round(parseFloat(expenseAmount) * 100) : undefined,
+        attachment_url: isRecurring ? undefined : attachmentUrl
       })
 
       if (res && 'error' in res && res.error) {
         toast.error(res.error)
       } else {
-        toast.success('Fabrika gideri başarıyla eklendi!')
+        toast.success('Gider başarıyla eklendi!')
         setExpenseAmount('')
         setExpenseDescription('')
+        setAttachmentUrl('')
+        setIsRecurring(false)
         setShowExpenseModal(false)
       }
     })
@@ -122,6 +157,19 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         toast.error(res.error)
       } else {
         toast.success('Gider başarıyla ödendi işaretlendi ve kasadan düşüldü!')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Ödeme işlemi başarısız.')
+    }
+  }
+
+  const handlePayExpenseRecurring = async (expenseId: string, safeId: string, months: number) => {
+    try {
+      const res = await payRecurringFactoryExpense(expenseId, safeId, months)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success(`${months} aylık gider ödemesi yapıldı ve kasadan düşüldü!`)
       }
     } catch (e: any) {
       toast.error(e.message || 'Ödeme işlemi başarısız.')
@@ -143,9 +191,24 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     }
   }
 
-  // Stats for expenses
-  const totalUnpaidExpenses = expenses.filter(e => e.status === 'unpaid').reduce((sum, e) => sum + e.amount, 0)
-  const totalPaidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0)
+  // Live calculation of totals
+  let totalUnpaidExpenses = 0
+  let totalPaidExpenses = 0
+
+  expenses.forEach(e => {
+    if (e.is_recurring) {
+      const unpaidMonths = getRecurringUnpaidMonths(e.start_date, e.recurrence_day, e.months_paid)
+      const monthlyAmt = e.monthly_amount || e.amount
+      totalUnpaidExpenses += unpaidMonths * monthlyAmt
+      totalPaidExpenses += (e.months_paid || 0) * monthlyAmt
+    } else {
+      if (e.status === 'paid') {
+        totalPaidExpenses += e.amount
+      } else {
+        totalUnpaidExpenses += e.amount
+      }
+    }
+  })
 
   return (
     <div className="space-y-6 pb-24 animate-in-up">
@@ -421,65 +484,147 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                       <tr>
                         <th className="px-4 py-3 font-medium">Gider Türü</th>
                         <th className="px-4 py-3 font-medium text-right">Tutar</th>
-                        <th className="px-4 py-3 font-medium">Son Ödeme Tarihi</th>
+                        <th className="px-4 py-3 font-medium">Vade / Ödeme Günü</th>
                         <th className="px-4 py-3 font-medium">Durum</th>
                         <th className="px-4 py-3 font-medium">Ödeme Detayı</th>
                         <th className="px-4 py-3 text-right">İşlemler</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {expenses.map((exp) => (
-                        <tr key={exp.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 font-semibold">{EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type}</td>
-                          <td className="px-4 py-3 text-right font-bold tabular-nums">{formatCurrency(exp.amount)}</td>
-                          <td className="px-4 py-3 text-rose-600 font-medium whitespace-nowrap">{formatDate(exp.due_date)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              exp.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                            }`}>
-                              {exp.status === 'paid' ? 'Ödendi' : 'Bekliyor'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-muted-foreground text-xs">
-                            {exp.status === 'paid' ? (
-                              <span>
-                                {formatDate(exp.paid_date)} tarihinde {safes.find(s => s.id === exp.safe_id)?.name || 'Kasa'} kasasından ödendi.
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {exp.status === 'unpaid' && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
-                                    Öde
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48 bg-card border">
-                                    <div className="px-2 py-1.5 text-xs text-muted-foreground font-semibold border-b">
-                                      Giderin Ödeneceği Kasa:
-                                    </div>
-                                    {safes.map(safe => (
-                                      <DropdownMenuItem key={safe.id} onClick={() => handlePayExpense(exp.id, safe.id)} className="cursor-pointer">
-                                        {safe.name} ile Öde
-                                      </DropdownMenuItem>
-                                    ))}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                      {expenses.map((exp) => {
+                        const isRec = exp.is_recurring
+                        const unpaidMonths = isRec ? getRecurringUnpaidMonths(exp.start_date, exp.recurrence_day, exp.months_paid) : 0
+                        const monthlyAmt = exp.monthly_amount || exp.amount
+
+                        return (
+                          <tr key={exp.id} className="hover:bg-muted/30 transition-colors">
+                            <td className="px-4 py-3 font-semibold">
+                              <div className="flex items-center gap-1.5">
+                                <span>{EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type}</span>
+                                {isRec && (
+                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                                    Düzenli Gider
+                                  </span>
+                                )}
+                                {exp.attachment_url && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-muted-foreground"
+                                    onClick={() => alert(`Ekli Fatura Belgesi: ${exp.attachment_url}`)}
+                                    title="Fatura Ekini Görüntüle"
+                                  >
+                                    <Paperclip className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                              {exp.description && (
+                                <p className="text-[10px] text-muted-foreground font-normal mt-0.5">{exp.description}</p>
                               )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => handleDeleteExpense(exp.id)}
-                                className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg cursor-pointer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-4 py-3 text-right font-bold tabular-nums">
+                              {isRec 
+                                ? `${formatCurrency(monthlyAmt)} / Ay` 
+                                : formatCurrency(exp.amount)
+                              }
+                            </td>
+                            <td className="px-4 py-3 text-rose-600 font-medium whitespace-nowrap">
+                              {isRec 
+                                ? `Her ayın ${exp.recurrence_day}'u` 
+                                : formatDate(exp.due_date)
+                              }
+                            </td>
+                            <td className="px-4 py-3">
+                              {isRec ? (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  unpaidMonths > 0 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {unpaidMonths > 0 ? `${unpaidMonths} Aylık Borç Birikti` : 'Ödendi'}
+                                </span>
+                              ) : (
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  exp.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {exp.status === 'paid' ? 'Ödendi' : 'Bekliyor'}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground text-xs">
+                              {isRec ? (
+                                <span>Toplam {exp.months_paid || 0} ay ödendi.</span>
+                              ) : (
+                                exp.status === 'paid' ? (
+                                  <span>
+                                    {formatDate(exp.paid_date)} tarihinde {safes.find(s => s.id === exp.safe_id)?.name || 'Kasa'} kasasından ödendi.
+                                  </span>
+                                ) : (
+                                  '—'
+                                )
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {isRec ? (
+                                  unpaidMonths > 0 && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
+                                        Öde
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-56 bg-card border">
+                                        <div className="px-2 py-1.5 text-xs text-muted-foreground font-semibold border-b">
+                                          Ödenecek Ay Sayısı Seçin:
+                                        </div>
+                                        {Array.from({ length: unpaidMonths }, (_, i) => i + 1).map(months => (
+                                          <DropdownMenuSub key={months}>
+                                            <DropdownMenuSubTrigger className="cursor-pointer">
+                                              {months} Aylık Öde ({formatCurrency(monthlyAmt * months)})
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuPortal>
+                                              <DropdownMenuSubContent className="bg-card border">
+                                                {safes.map(safe => (
+                                                  <DropdownMenuItem key={safe.id} onClick={() => handlePayExpenseRecurring(exp.id, safe.id, months)} className="cursor-pointer">
+                                                    {safe.name} ile Öde
+                                                  </DropdownMenuItem>
+                                                ))}
+                                              </DropdownMenuSubContent>
+                                            </DropdownMenuPortal>
+                                          </DropdownMenuSub>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )
+                                ) : (
+                                  exp.status === 'unpaid' && (
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 cursor-pointer">
+                                        Öde
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" className="w-48 bg-card border">
+                                        <div className="px-2 py-1.5 text-xs text-muted-foreground font-semibold border-b">
+                                          Giderin Ödeneceği Kasa:
+                                        </div>
+                                        {safes.map(safe => (
+                                          <DropdownMenuItem key={safe.id} onClick={() => handlePayExpense(exp.id, safe.id)} className="cursor-pointer">
+                                            {safe.name} ile Öde
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  )
+                                )}
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteExpense(exp.id)}
+                                  className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg cursor-pointer"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </CardContent>
@@ -586,17 +731,35 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                   <td colSpan={5} className="border border-gray-400 text-center py-2 text-gray-500">Gider kaydı bulunmuyor.</td>
                 </tr>
               ) : (
-                expenses.map(exp => (
-                  <tr key={exp.id}>
-                    <td className="border border-gray-400 px-2 py-1 font-semibold">{EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type}</td>
-                    <td className="border border-gray-400 px-2 py-1">{formatDate(exp.due_date)}</td>
-                    <td className="border border-gray-400 px-2 py-1 text-right font-bold">{formatCurrency(exp.amount)}</td>
-                    <td className="border border-gray-400 px-2 py-1 text-center">{exp.status === 'paid' ? 'Ödendi' : 'Bekliyor'}</td>
-                    <td className="border border-gray-400 px-2 py-1 text-xs text-gray-600">
-                      {exp.status === 'paid' ? `${formatDate(exp.paid_date)} tarihinde kasadan ödendi.` : '—'}
-                    </td>
-                  </tr>
-                ))
+                expenses.map(exp => {
+                  const isRec = exp.is_recurring
+                  const unpaidMonths = isRec ? getRecurringUnpaidMonths(exp.start_date, exp.recurrence_day, exp.months_paid) : 0
+                  const amountText = isRec 
+                    ? `Aylık ${formatCurrency(exp.monthly_amount || exp.amount)}` 
+                    : formatCurrency(exp.amount)
+                  const dateText = isRec 
+                    ? `Her ayın ${exp.recurrence_day}'u` 
+                    : formatDate(exp.due_date)
+                  const statusText = isRec
+                    ? (unpaidMonths > 0 ? `${unpaidMonths} Aylık Borç Birikti` : 'Ödendi')
+                    : (exp.status === 'paid' ? 'Ödendi' : 'Bekliyor')
+                  const detailText = isRec
+                    ? `Toplam ${exp.months_paid || 0} ay ödendi.`
+                    : (exp.status === 'paid' ? `${formatDate(exp.paid_date)} tarihinde kasadan ödendi.` : '—')
+
+                  return (
+                    <tr key={exp.id}>
+                      <td className="border border-gray-400 px-2 py-1 font-semibold">
+                        {EXPENSE_TYPE_LABELS[exp.expense_type] || exp.expense_type}
+                        {isRec && ' (Düzenli)'}
+                      </td>
+                      <td className="border border-gray-400 px-2 py-1 text-right">{amountText}</td>
+                      <td className="border border-gray-400 px-2 py-1">{dateText}</td>
+                      <td className="border border-gray-400 px-2 py-1 text-center">{statusText}</td>
+                      <td className="border border-gray-400 px-2 py-1 text-xs text-gray-600">{detailText}</td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -622,7 +785,9 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                 <Label className="text-xs">Gider Türü</Label>
                 <Select value={expenseType} onValueChange={(val) => setExpenseType(val || 'Other')}>
                   <SelectTrigger className="h-10 rounded-lg">
-                    <SelectValue />
+                    <SelectValue>
+                      {EXPENSE_TYPE_LABELS[expenseType] || expenseType}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="bg-card border">
                     <SelectItem value="Rent">Kira</SelectItem>
@@ -636,31 +801,106 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="expenseAmount" className="text-xs">Tutar (TL)</Label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  id="expenseAmount"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  placeholder="0,00"
-                  className="h-10 rounded-lg"
-                  required
+              {/* Checkbox for Recurring Gider */}
+              <div className="flex items-center gap-2 py-1">
+                <input 
+                  type="checkbox" 
+                  id="isRecurring" 
+                  checked={isRecurring} 
+                  onChange={(e) => setIsRecurring(e.target.checked)} 
+                  className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
                 />
+                <Label htmlFor="isRecurring" className="cursor-pointer font-medium text-xs">
+                  Aylık Düzenli Tekrarlanan Gider (Kira vb.)
+                </Label>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="expenseDueDate" className="text-xs">Son Ödeme Tarihi</Label>
-                <Input 
-                  type="date" 
-                  id="expenseDueDate"
-                  value={expenseDueDate}
-                  onChange={(e) => setExpenseDueDate(e.target.value)}
-                  className="h-10 rounded-lg"
-                  required
-                />
-              </div>
+              {isRecurring ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="recurrenceDay" className="text-xs">Her Ayın Günü</Label>
+                      <Input 
+                        type="number" 
+                        min="1"
+                        max="31"
+                        id="recurrenceDay"
+                        value={recurrenceDay}
+                        onChange={(e) => setRecurrenceDay(e.target.value)}
+                        placeholder="10"
+                        className="h-10 rounded-lg"
+                        required={isRecurring}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="startDate" className="text-xs">Başlangıç Tarihi</Label>
+                      <Input 
+                        type="date" 
+                        id="startDate"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="h-10 rounded-lg"
+                        required={isRecurring}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="monthlyAmount" className="text-xs">Aylık Sabit Tutar (TL)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      id="monthlyAmount"
+                      value={expenseAmount}
+                      onChange={(e) => setExpenseAmount(e.target.value)}
+                      placeholder="0,00"
+                      className="h-10 rounded-lg"
+                      required={isRecurring}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <Label htmlFor="expenseAmount" className="text-xs">Tutar (TL)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      id="expenseAmount"
+                      value={expenseAmount}
+                      onChange={(e) => setExpenseAmount(e.target.value)}
+                      placeholder="0,00"
+                      className="h-10 rounded-lg"
+                      required={!isRecurring}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="expenseDueDate" className="text-xs">Son Ödeme Tarihi</Label>
+                    <Input 
+                      type="date" 
+                      id="expenseDueDate"
+                      value={expenseDueDate}
+                      onChange={(e) => setExpenseDueDate(e.target.value)}
+                      className="h-10 rounded-lg"
+                      required={!isRecurring}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="expenseFile" className="text-xs">Fatura Belgesi (İsteğe Bağlı PDF/Görsel)</Label>
+                    <Input 
+                      type="file" 
+                      id="expenseFile" 
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setAttachmentUrl(file.name)
+                        }
+                      }}
+                      className="h-10 rounded-lg cursor-pointer"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="space-y-1">
                 <Label htmlFor="expenseDesc" className="text-xs">Açıklama</Label>
@@ -669,7 +909,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                   id="expenseDesc"
                   value={expenseDescription}
                   onChange={(e) => setExpenseDescription(e.target.value)}
-                  placeholder="örn: Temmuz 2026 Elektrik"
+                  placeholder={isRecurring ? "örn: Fabrika Dükkan Kirası" : "örn: Temmuz 2026 Elektrik"}
                   className="h-10 rounded-lg"
                 />
               </div>

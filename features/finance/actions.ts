@@ -312,7 +312,9 @@ export async function cashChequeNote(data: {
   chequeId: string
   safeId: string
   applyDiscount: boolean
-  discountRate?: number
+  interestAmount?: number // in cents
+  commissionAmount?: number // in cents
+  bankExpenseAmount?: number // in cents
   expenseTarget?: 'safe' | 'account'
   expenseTargetId?: string // safeId or accountId
 }) {
@@ -332,22 +334,13 @@ export async function cashChequeNote(data: {
     if (fetchErr || !cheque) return { error: 'Çek/Senet bulunamadı.' }
     if (cheque.status === 'cashed') return { error: 'Bu evrak zaten tahsil edilmiş.' }
 
-    // Calculate days until due date from today
     const today = new Date()
-    const dueDate = new Date(cheque.due_date)
-    const diffTime = dueDate.getTime() - today.getTime()
-    const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
 
     let discountAmount = 0
-    let netAmount = cheque.amount
-
-    if (data.applyDiscount && data.discountRate && data.discountRate > 0) {
-      const monthlyRate = data.discountRate / 100
-      const dailyRate = monthlyRate / 30
-      // cheque.amount is in cents
-      discountAmount = Math.round(cheque.amount * dailyRate * diffDays)
-      netAmount = cheque.amount - discountAmount
+    if (data.applyDiscount) {
+      discountAmount = (data.interestAmount || 0) + (data.commissionAmount || 0) + (data.bankExpenseAmount || 0)
     }
+    const netAmount = cheque.amount - discountAmount
 
     // 2. Update cheque status to cashed
     const { error: updateErr } = await supabase
@@ -380,16 +373,18 @@ export async function cashChequeNote(data: {
 
     // Transaction 2: If there's a discount expense/income
     if (data.applyDiscount && discountAmount > 0) {
+      const descText = isIncoming
+        ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Gideri (Faiz: ${((data.interestAmount || 0)/100).toFixed(2)} TL, Komisyon: ${((data.commissionAmount || 0)/100).toFixed(2)} TL, Masraf: ${((data.bankExpenseAmount || 0)/100).toFixed(2)} TL)`
+        : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirim Geliri (Faiz: ${((data.interestAmount || 0)/100).toFixed(2)} TL, Komisyon: ${((data.commissionAmount || 0)/100).toFixed(2)} TL, Masraf: ${((data.bankExpenseAmount || 0)/100).toFixed(2)} TL)`
+
       if (data.expenseTarget === 'account' && data.expenseTargetId) {
-        // Charge the customer (increases their debt for incoming, or decreases their credit/debt for outgoing)
+        // Charge/Credit the customer account
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           account_id: data.expenseTargetId,
           transaction_type: isIncoming ? 'payment_out' : 'payment_in',
           amount: discountAmount,
-          description: isIncoming
-            ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Vade Farkı Yansıtma (${data.discountRate}%)`
-            : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirimi Yansıtma (${data.discountRate}%)`,
+          description: descText,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
           category: isIncoming ? 'payment_out' : 'payment_in',
@@ -397,16 +392,14 @@ export async function cashChequeNote(data: {
         })
         if (expError) return { error: `Müşteri borç/alacak yansıtma kaydı oluşturulamadı: ${expError.message}` }
       } else {
-        // Charge to safe (reduces safe balance as expense for incoming, or increases safe balance as income/saving for outgoing)
+        // Charge/Credit the selected safe/bank
         const targetSafeId = data.expenseTargetId || data.safeId
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           safe_id: targetSafeId,
           transaction_type: isIncoming ? 'payment_out' : 'payment_in',
           amount: discountAmount,
-          description: isIncoming
-            ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discountRate}%)`
-            : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirimi Geliri (${data.discountRate}%)`,
+          description: descText,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
           category: isIncoming ? 'payment_out' : 'payment_in',
@@ -427,8 +420,13 @@ export async function cashChequeNote(data: {
 export async function createFactoryExpense(data: {
   expense_type: string
   amount: number // in cents
-  due_date: string
+  due_date?: string
   description?: string
+  is_recurring: boolean
+  recurrence_day?: number
+  start_date?: string
+  monthly_amount?: number // in cents
+  attachment_url?: string
 }) {
   try {
     const companyInfo = await getActiveCompany()
@@ -438,10 +436,16 @@ export async function createFactoryExpense(data: {
     const { error } = await supabase.from('factory_expenses').insert({
       company_id: companyInfo.id,
       expense_type: data.expense_type,
-      amount: data.amount,
-      due_date: data.due_date,
+      amount: data.is_recurring ? (data.monthly_amount || 0) : data.amount,
+      due_date: data.is_recurring ? (data.start_date || new Date().toISOString().split('T')[0]) : (data.due_date || new Date().toISOString().split('T')[0]),
       status: 'unpaid',
-      description: data.description || null
+      description: data.description || null,
+      is_recurring: data.is_recurring,
+      recurrence_day: data.is_recurring ? data.recurrence_day : null,
+      start_date: data.is_recurring ? data.start_date : null,
+      months_paid: data.is_recurring ? 0 : null,
+      monthly_amount: data.is_recurring ? data.monthly_amount : null,
+      attachment_url: data.attachment_url || null
     })
 
     if (error) return { error: error.message }
@@ -478,7 +482,7 @@ export async function payFactoryExpense(expenseId: string, safeId: string) {
       safe_id: safeId,
       transaction_type: 'payment_out',
       amount: expense.amount,
-      description: `Fabrika Gideri: ${expense.expense_type} (${expense.description || ''})`,
+      description: `Fabrika Gideri: ${expense.expense_type === 'Rent' ? 'Kira' : expense.expense_type} (${expense.description || ''})`,
       transaction_date: today,
       payment_method: 'Havale/EFT',
       category: 'payment_out',
@@ -499,6 +503,61 @@ export async function payFactoryExpense(expenseId: string, safeId: string) {
       .eq('company_id', companyInfo.id)
 
     if (updateErr) return { error: `Gider durumu güncellenemedi: ${updateErr.message}` }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function payRecurringFactoryExpense(expenseId: string, safeId: string, monthsToPay: number) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch expense details
+    const { data: expense, error: fetchErr } = await supabase
+      .from('factory_expenses')
+      .select('*')
+      .eq('id', expenseId)
+      .eq('company_id', companyInfo.id)
+      .single()
+
+    if (fetchErr || !expense) return { error: 'Gider kaydı bulunamadı.' }
+    if (!expense.is_recurring) return { error: 'Bu gider tekrarlanan tipte değil.' }
+
+    const today = new Date().toISOString().split('T')[0]
+    const payAmount = (expense.monthly_amount || expense.amount) * monthsToPay
+
+    // 2. Create transaction
+    const { error: txError } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      safe_id: safeId,
+      transaction_type: 'payment_out',
+      amount: payAmount,
+      description: `Fabrika Gideri: ${expense.expense_type === 'Rent' ? 'Kira' : expense.expense_type} (${monthsToPay} Aylık Ödeme)`,
+      transaction_date: today,
+      payment_method: 'Havale/EFT',
+      category: 'payment_out',
+      currency: 'TRY'
+    })
+
+    if (txError) return { error: `Kasa ödeme kaydı oluşturulamadı: ${txError.message}` }
+
+    // 3. Update months_paid
+    const { error: updateErr } = await supabase
+      .from('factory_expenses')
+      .update({
+        months_paid: (expense.months_paid || 0) + monthsToPay
+      })
+      .eq('id', expenseId)
+      .eq('company_id', companyInfo.id)
+
+    if (updateErr) return { error: `Gider kaydı güncellenemedi: ${updateErr.message}` }
 
     revalidatePath('/finance')
     revalidatePath('/')
