@@ -33,6 +33,11 @@ export async function createNewCompany(name: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Oturum açmış kullanıcı bulunamadı.' }
 
+  // Enforce restriction that only albayrakselim9@gmail.com can create new companies
+  if (user.email !== 'albayrakselim9@gmail.com') {
+    return { error: 'Yeni şirket oluşturma yetkiniz bulunmamaktadır (Yalnızca albayrakselim9@gmail.com).' }
+  }
+
   // Insert company
   const { data: company, error: compErr } = await supabase
     .from('companies')

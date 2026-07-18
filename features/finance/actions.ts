@@ -366,10 +366,10 @@ export async function cashChequeNote(data: {
       company_id: companyInfo.id,
       safe_id: data.safeId,
       transaction_type: isIncoming ? 'payment_in' : 'payment_out',
-      amount: isIncoming ? netAmount : cheque.amount,
+      amount: netAmount, // This is net amount paid/received
       description: isIncoming 
         ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı (Net Tutar)`
-        : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Ödemesi (Kasadan Çıkış)`,
+        : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödemesi (Net Tutar)`,
       transaction_date: today.toISOString().split('T')[0],
       payment_method: 'Havale/EFT',
       category: isIncoming ? 'payment_in' : 'payment_out',
@@ -378,37 +378,41 @@ export async function cashChequeNote(data: {
 
     if (txError) return { error: `${isIncoming ? 'Tahsilat' : 'Ödeme'} kaydı oluşturulamadı: ${txError.message}` }
 
-    // Transaction 2: If there's a discount expense
+    // Transaction 2: If there's a discount expense/income
     if (data.applyDiscount && discountAmount > 0) {
       if (data.expenseTarget === 'account' && data.expenseTargetId) {
-        // Charge the customer (increases their debt)
+        // Charge the customer (increases their debt for incoming, or decreases their credit/debt for outgoing)
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           account_id: data.expenseTargetId,
-          transaction_type: 'payment_out',
+          transaction_type: isIncoming ? 'payment_out' : 'payment_in',
           amount: discountAmount,
-          description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Vade Farkı Yansıtma (${data.discountRate}%)`,
+          description: isIncoming
+            ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Vade Farkı Yansıtma (${data.discountRate}%)`
+            : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirimi Yansıtma (${data.discountRate}%)`,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
-          category: 'payment_out',
+          category: isIncoming ? 'payment_out' : 'payment_in',
           currency: 'TRY'
         })
-        if (expError) return { error: `Müşteri borç yansıtma kaydı oluşturulamadı: ${expError.message}` }
+        if (expError) return { error: `Müşteri borç/alacak yansıtma kaydı oluşturulamadı: ${expError.message}` }
       } else {
-        // Charge to safe (reduces safe balance as expense)
+        // Charge to safe (reduces safe balance as expense for incoming, or increases safe balance as income/saving for outgoing)
         const targetSafeId = data.expenseTargetId || data.safeId
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           safe_id: targetSafeId,
-          transaction_type: 'payment_out',
+          transaction_type: isIncoming ? 'payment_out' : 'payment_in',
           amount: discountAmount,
-          description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discountRate}%)`,
+          description: isIncoming
+            ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discountRate}%)`
+            : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirimi Geliri (${data.discountRate}%)`,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
-          category: 'payment_out',
+          category: isIncoming ? 'payment_out' : 'payment_in',
           currency: 'TRY'
         })
-        if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
+        if (expError) return { error: `Vade farkı gider/gelir kaydı oluşturulamadı: ${expError.message}` }
       }
     }
 

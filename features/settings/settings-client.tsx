@@ -237,9 +237,11 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
                 <CardTitle className="text-lg">Erişiminiz Olan Şirketler</CardTitle>
                 <CardDescription>Aktif şirketini seçebilir veya yeni şirket ekleyebilirsiniz</CardDescription>
               </div>
-              <Button onClick={() => setShowCompanyModal(true)} size="sm" className="rounded-xl">
-                <Plus className="w-4 h-4 mr-1.5" /> Yeni Şirket
-              </Button>
+              {currentUser.email === 'albayrakselim9@gmail.com' && (
+                <Button onClick={() => setShowCompanyModal(true)} size="sm" className="rounded-xl">
+                  <Plus className="w-4 h-4 mr-1.5" /> Yeni Şirket
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="divide-y p-0">
               {companyInfo.allCompanies.map((c) => (
