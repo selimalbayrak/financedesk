@@ -9,12 +9,6 @@ export const metadata: Metadata = {
 }
 
 export default async function SettingsPage() {
-  const companyInfo = await getActiveCompany()
-  
-  if (!companyInfo) {
-    redirect('/')
-  }
-
   const supabase = await createClient()
   
   // Get current user profile
@@ -23,16 +17,21 @@ export default async function SettingsPage() {
     redirect('/login')
   }
 
-  // Get active company members
-  const { data: membersRaw, error: rpcError } = await supabase.rpc('get_company_members', {
-    p_company_id: companyInfo.id
-  })
+  const companyInfo = await getActiveCompany()
 
-  if (rpcError) {
-    console.error('Error fetching company members:', rpcError)
+  // Get active company members (only if company is selected)
+  let members: any[] = []
+  if (companyInfo) {
+    const { data: membersRaw, error: rpcError } = await supabase.rpc('get_company_members', {
+      p_company_id: companyInfo.id
+    })
+
+    if (rpcError) {
+      console.error('Error fetching company members:', rpcError)
+    } else {
+      members = membersRaw ?? []
+    }
   }
-
-  const members = membersRaw ?? []
 
   return (
     <SettingsClient

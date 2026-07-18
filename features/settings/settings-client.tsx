@@ -51,7 +51,7 @@ interface SettingsClientProps {
       name: string
       role: string
     }>
-  }
+  } | null
   members: Member[]
 }
 
@@ -165,7 +165,7 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
     })
   }
 
-  const canManageMembers = companyInfo.role === 'owner' || companyInfo.role === 'admin'
+  const canManageMembers = companyInfo ? (companyInfo.role === 'owner' || companyInfo.role === 'admin') : false
 
   return (
     <div className="space-y-6 pb-24 animate-in-up">
@@ -235,7 +235,9 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
             <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
               <div>
                 <CardTitle className="text-lg">Erişiminiz Olan Şirketler</CardTitle>
-                <CardDescription>Aktif şirketini seçebilir veya yeni şirket ekleyebilirsiniz</CardDescription>
+                <CardDescription>
+                  {companyInfo ? 'Aktif şirketini seçebilir veya yeni şirket ekleyebilirsiniz' : 'Henüz bir şirkete erişiminiz yok. Lütfen yeni bir şirket oluşturun.'}
+                </CardDescription>
               </div>
               {currentUser.email === 'albayrakselim9@gmail.com' && (
                 <Button onClick={() => setShowCompanyModal(true)} size="sm" className="rounded-xl">
@@ -244,36 +246,49 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
               )}
             </CardHeader>
             <CardContent className="divide-y p-0">
-              {companyInfo.allCompanies.map((c) => (
-                <div key={c.id} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Building2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">{ROLE_LABELS[c.role] || c.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {c.id === companyInfo.id ? (
-                      <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-200">
-                        <Check className="w-3.5 h-3.5" /> Aktif
-                      </span>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => handleSwitchCompany(c.id)}
-                        disabled={isPending}
-                        className="rounded-xl cursor-pointer"
-                      >
-                        Geçiş Yap
-                      </Button>
-                    )}
-                  </div>
+              {!companyInfo || companyInfo.allCompanies.length === 0 ? (
+                <div className="text-center py-10 px-4">
+                  <p className="text-sm text-muted-foreground">
+                    Davet edildiğiniz bir şirket bulunmuyor.
+                  </p>
+                  {currentUser.email !== 'albayrakselim9@gmail.com' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Şirkete erişmek için sistem yöneticinizin (albayrakselim9@gmail.com) bu maili davet etmesi gerekmektedir.
+                    </p>
+                  )}
                 </div>
-              ))}
+              ) : (
+                companyInfo.allCompanies.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-4 hover:bg-muted/20 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm">{c.name}</p>
+                        <p className="text-xs text-muted-foreground">{ROLE_LABELS[c.role] || c.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {c.id === companyInfo.id ? (
+                        <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-full border border-emerald-200">
+                          <Check className="w-3.5 h-3.5" /> Aktif
+                        </span>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => handleSwitchCompany(c.id)}
+                          disabled={isPending}
+                          className="rounded-xl cursor-pointer"
+                        >
+                          Geçiş Yap
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -284,7 +299,13 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
             <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
               <div>
                 <CardTitle className="text-lg">Şirket Yetkilendirmeleri</CardTitle>
-                <CardDescription><strong>{companyInfo.name}</strong> şirketine erişimi olan tüm kullanıcılar</CardDescription>
+                <CardDescription>
+                  {companyInfo ? (
+                    <><strong>{companyInfo.name}</strong> şirketine erişimi olan tüm kullanıcılar</>
+                  ) : (
+                    'Lütfen önce aktif bir şirket seçin veya oluşturun'
+                  )}
+                </CardDescription>
               </div>
               {canManageMembers && (
                 <Button onClick={() => setShowMemberModal(true)} size="sm" className="rounded-xl">
@@ -293,7 +314,9 @@ export function SettingsClient({ currentUser, companyInfo, members }: SettingsCl
               )}
             </CardHeader>
             <CardContent className="divide-y p-0">
-              {members.length === 0 ? (
+              {!companyInfo ? (
+                <p className="text-sm text-muted-foreground text-center py-10">Lütfen önce bir şirket oluşturun veya seçin.</p>
+              ) : members.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-10">Kullanıcı kaydı bulunamadı</p>
               ) : (
                 members.map((m) => {
