@@ -185,7 +185,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal Box */}
-      <div className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up">
+      <div className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-2 border-b">
           <div className="flex items-center gap-2 text-primary">
             <Landmark className="w-5 h-5" />

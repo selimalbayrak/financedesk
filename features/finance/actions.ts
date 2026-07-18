@@ -17,9 +17,11 @@ export async function createChequeNote(data: {
   notes?: string
   // Vade farkı (discount) parameters
   apply_discount?: boolean
-  discount_rate?: number
-  discount_amount?: number // in cents
-  net_amount?: number // in cents
+  interest_amount?: number // in cents
+  commission_amount?: number // in cents
+  bank_expense_amount?: number // in cents
+  expense_target?: 'safe' | 'account'
+  expense_target_id?: string // safeId or accountId
   safe_id?: string
 }) {
   try {
@@ -28,8 +30,8 @@ export async function createChequeNote(data: {
 
     const supabase = await createClient()
     
-    // Status is 'cashed' if discount is applied, otherwise 'portfolio'
-    const status = data.apply_discount ? 'cashed' : 'portfolio'
+    // Status is always 'portfolio' because discounted cheques also remain active until maturity
+    const status = 'portfolio'
 
     const { data: cheque, error } = await supabase.from('cheques_notes').insert({
       company_id: companyInfo.id,
@@ -54,11 +56,11 @@ export async function createChequeNote(data: {
       const description = `${data.type === 'cheque' ? 'Çek' : 'Senet'} Girişi - Vade: ${data.due_date}`
 
       // Create primary transaction (affects account balance)
-      // If discount is applied, it goes to safe_id. If not, safe_id is null (sits in portfolio)
+      // Since it is just entered and sits in portfolio, safe_id is null
       const { error: txError } = await supabase.from('transactions').insert({
         company_id: companyInfo.id,
         account_id: data.account_id,
-        safe_id: data.apply_discount ? data.safe_id : null,
+        safe_id: null,
         transaction_type: transactionType,
         amount: data.amount, // Full amount
         description: description,
@@ -70,21 +72,61 @@ export async function createChequeNote(data: {
 
       if (txError) return { error: `Cari hareket oluşturulamadı: ${txError.message}` }
 
-      // If discount is applied, create an Expense transaction for the discount (vade farkı)
-      if (data.apply_discount && data.discount_amount && data.discount_amount > 0 && data.safe_id) {
-        const { error: expError } = await supabase.from('transactions').insert({
+      // If discount is applied immediately on creation (kırdırma)
+      if (data.apply_discount && data.safe_id) {
+        const totalDiscount = (data.interest_amount || 0) + (data.commission_amount || 0) + (data.bank_expense_amount || 0)
+        const netAmount = data.amount - totalDiscount
+        const isIncoming = data.direction === 'in'
+
+        // 1. Net amount enters/leaves the main safe_id
+        const { error: netTxErr } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           safe_id: data.safe_id,
-          transaction_type: 'payment_out', // Gider/Ödeme Çıkışı
-          amount: data.discount_amount,
-          description: `${data.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Vade Farkı Kesintisi (${data.discount_rate}%)`,
+          transaction_type: isIncoming ? 'payment_in' : 'payment_out',
+          amount: netAmount,
+          description: `${data.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Tahsilatı (Net Tutar)`,
           transaction_date: data.issue_date,
-          payment_method: 'Nakit',
-          category: 'payment_out',
+          payment_method: 'Havale/EFT',
+          category: isIncoming ? 'payment_in' : 'payment_out',
           currency: 'TRY'
         })
+        if (netTxErr) return { error: `Net tutar tahsilat kaydı oluşturulamadı: ${netTxErr.message}` }
 
-        if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
+        // 2. Discount fee transaction (Faiz, Komisyon, Masraf)
+        if (totalDiscount > 0) {
+          const descText = isIncoming
+            ? `${data.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Gideri (Faiz: ${((data.interest_amount || 0)/100).toFixed(2)} TL, Komisyon: ${((data.commission_amount || 0)/100).toFixed(2)} TL, Masraf: ${((data.bank_expense_amount || 0)/100).toFixed(2)} TL)`
+            : `${data.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödeme İndirim Geliri (Faiz: ${((data.interest_amount || 0)/100).toFixed(2)} TL, Komisyon: ${((data.commission_amount || 0)/100).toFixed(2)} TL, Masraf: ${((data.bank_expense_amount || 0)/100).toFixed(2)} TL)`
+
+          if (data.expense_target === 'account' && data.expense_target_id) {
+            const { error: expError } = await supabase.from('transactions').insert({
+              company_id: companyInfo.id,
+              account_id: data.expense_target_id,
+              transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+              amount: totalDiscount,
+              description: descText,
+              transaction_date: data.issue_date,
+              payment_method: 'Nakit',
+              category: isIncoming ? 'payment_out' : 'payment_in',
+              currency: 'TRY'
+            })
+            if (expError) return { error: `Müşteri masraf yansıtma kaydı oluşturulamadı: ${expError.message}` }
+          } else {
+            const targetSafeId = data.expense_target_id || data.safe_id
+            const { error: expError } = await supabase.from('transactions').insert({
+              company_id: companyInfo.id,
+              safe_id: targetSafeId,
+              transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+              amount: totalDiscount,
+              description: descText,
+              transaction_date: data.issue_date,
+              payment_method: 'Nakit',
+              category: isIncoming ? 'payment_out' : 'payment_in',
+              currency: 'TRY'
+            })
+            if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
+          }
+        }
       }
     }
 
@@ -342,15 +384,17 @@ export async function cashChequeNote(data: {
     }
     const netAmount = cheque.amount - discountAmount
 
-    // 2. Update cheque status to cashed
-    const { error: updateErr } = await supabase
-      .from('cheques_notes')
-      .update({
-        status: 'cashed'
-      })
-      .eq('id', data.chequeId)
+    // 2. Update cheque status to cashed ONLY if not cashing early (kırdırma)
+    if (!data.applyDiscount) {
+      const { error: updateErr } = await supabase
+        .from('cheques_notes')
+        .update({
+          status: 'cashed'
+        })
+        .eq('id', data.chequeId)
 
-    if (updateErr) return { error: updateErr.message }
+      if (updateErr) return { error: updateErr.message }
+    }
 
     // 3. Create transactions
     // Transaction 1: Money entering safe (for direction === in) or leaving safe (for direction === out)
