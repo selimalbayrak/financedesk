@@ -20,9 +20,11 @@ export async function createChequeNote(data: {
   interest_amount?: number // in cents
   commission_amount?: number // in cents
   bank_expense_amount?: number // in cents
+  net_target?: 'safe' | 'account'
+  net_target_id?: string
   expense_target?: 'safe' | 'account'
-  expense_target_id?: string // safeId or accountId
-  safe_id?: string
+  expense_target_id?: string
+  safe_id?: string // legacy fallback
 }) {
   try {
     const companyInfo = await getActiveCompany()
@@ -73,15 +75,18 @@ export async function createChequeNote(data: {
       if (txError) return { error: `Cari hareket oluşturulamadı: ${txError.message}` }
 
       // If discount is applied immediately on creation (kırdırma)
-      if (data.apply_discount && data.safe_id) {
+      if (data.apply_discount && (data.net_target_id || data.safe_id)) {
         const totalDiscount = (data.interest_amount || 0) + (data.commission_amount || 0) + (data.bank_expense_amount || 0)
         const netAmount = data.amount - totalDiscount
         const isIncoming = data.direction === 'in'
+        const netTargetType = data.net_target || 'safe'
+        const netTargetId = data.net_target_id || data.safe_id!
 
-        // 1. Net amount enters/leaves the main safe_id
+        // 1. Net amount enters/leaves the chosen target (safe or account)
         const { error: netTxErr } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
-          safe_id: data.safe_id,
+          safe_id: netTargetType === 'safe' ? netTargetId : null,
+          account_id: netTargetType === 'account' ? netTargetId : null,
           transaction_type: isIncoming ? 'payment_in' : 'payment_out',
           amount: netAmount,
           description: `${data.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Tahsilatı (Net Tutar)`,
@@ -102,26 +107,26 @@ export async function createChequeNote(data: {
             const { error: expError } = await supabase.from('transactions').insert({
               company_id: companyInfo.id,
               account_id: data.expense_target_id,
-              transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+              transaction_type: 'payment_out', // Always payment_out for deductions/masraf
               amount: totalDiscount,
               description: descText,
               transaction_date: data.issue_date,
               payment_method: 'Nakit',
-              category: isIncoming ? 'payment_out' : 'payment_in',
+              category: 'payment_out',
               currency: 'TRY'
             })
             if (expError) return { error: `Müşteri masraf yansıtma kaydı oluşturulamadı: ${expError.message}` }
           } else {
-            const targetSafeId = data.expense_target_id || data.safe_id
+            const targetSafeId = data.expense_target_id || data.safe_id!
             const { error: expError } = await supabase.from('transactions').insert({
               company_id: companyInfo.id,
               safe_id: targetSafeId,
-              transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+              transaction_type: 'payment_out', // Always payment_out for deductions/masraf
               amount: totalDiscount,
               description: descText,
               transaction_date: data.issue_date,
               payment_method: 'Nakit',
-              category: isIncoming ? 'payment_out' : 'payment_in',
+              category: 'payment_out',
               currency: 'TRY'
             })
             if (expError) return { error: `Vade farkı gider kaydı oluşturulamadı: ${expError.message}` }
@@ -352,13 +357,15 @@ export async function unpayLoanInstallment(installmentId: string) {
 
 export async function cashChequeNote(data: {
   chequeId: string
-  safeId: string
   applyDiscount: boolean
   interestAmount?: number // in cents
   commissionAmount?: number // in cents
   bankExpenseAmount?: number // in cents
+  netTarget: 'safe' | 'account'
+  netTargetId: string
   expenseTarget?: 'safe' | 'account'
   expenseTargetId?: string // safeId or accountId
+  safeId?: string // legacy fallback
 }) {
   try {
     const companyInfo = await getActiveCompany()
@@ -397,23 +404,44 @@ export async function cashChequeNote(data: {
     }
 
     // 3. Create transactions
-    // Transaction 1: Money entering safe (for direction === in) or leaving safe (for direction === out)
     const isIncoming = cheque.direction === 'in'
-    const { error: txError } = await supabase.from('transactions').insert({
-      company_id: companyInfo.id,
-      safe_id: data.safeId,
-      transaction_type: isIncoming ? 'payment_in' : 'payment_out',
-      amount: netAmount, // This is net amount paid/received
-      description: isIncoming 
-        ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı (Net Tutar)`
-        : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödemesi (Net Tutar)`,
-      transaction_date: today.toISOString().split('T')[0],
-      payment_method: 'Havale/EFT',
-      category: isIncoming ? 'payment_in' : 'payment_out',
-      currency: 'TRY'
-    })
 
-    if (txError) return { error: `${isIncoming ? 'Tahsilat' : 'Ödeme'} kaydı oluşturulamadı: ${txError.message}` }
+    if (data.applyDiscount) {
+      // Net amount enters/leaves the chosen target (safe or account)
+      const { error: txError } = await supabase.from('transactions').insert({
+        company_id: companyInfo.id,
+        safe_id: data.netTarget === 'safe' ? data.netTargetId : null,
+        account_id: data.netTarget === 'account' ? data.netTargetId : null,
+        transaction_type: isIncoming ? 'payment_in' : 'payment_out',
+        amount: netAmount, // This is net amount paid/received
+        description: isIncoming 
+          ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Kırdırma Tahsilatı (Net Tutar)`
+          : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Erken Ödemesi (Net Tutar)`,
+        transaction_date: today.toISOString().split('T')[0],
+        payment_method: 'Havale/EFT',
+        category: isIncoming ? 'payment_in' : 'payment_out',
+        currency: 'TRY'
+      })
+
+      if (txError) return { error: `${isIncoming ? 'Tahsilat' : 'Ödeme'} kaydı oluşturulamadı: ${txError.message}` }
+    } else {
+      // Normal cashing to the selected safe
+      const { error: txError } = await supabase.from('transactions').insert({
+        company_id: companyInfo.id,
+        safe_id: data.safeId!,
+        transaction_type: isIncoming ? 'payment_in' : 'payment_out',
+        amount: cheque.amount,
+        description: isIncoming 
+          ? `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Tahsilatı`
+          : `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Ödemesi`,
+        transaction_date: today.toISOString().split('T')[0],
+        payment_method: 'Havale/EFT',
+        category: isIncoming ? 'payment_in' : 'payment_out',
+        currency: 'TRY'
+      })
+
+      if (txError) return { error: `${isIncoming ? 'Tahsilat' : 'Ödeme'} kaydı oluşturulamadı: ${txError.message}` }
+    }
 
     // Transaction 2: If there's a discount expense/income
     if (data.applyDiscount && discountAmount > 0) {
@@ -437,7 +465,7 @@ export async function cashChequeNote(data: {
         if (expError) return { error: `Müşteri borç/alacak yansıtma kaydı oluşturulamadı: ${expError.message}` }
       } else {
         // Charge/Credit the selected safe/bank
-        const targetSafeId = data.expenseTargetId || data.safeId
+        const targetSafeId = data.expenseTargetId || data.netTargetId
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           safe_id: targetSafeId,
@@ -638,6 +666,7 @@ export async function createCreditCard(data: {
   limit_amount: number // in cents
   cutoff_day: number
   due_day: number
+  min_payment_ratio?: number
 }) {
   try {
     const companyInfo = await getActiveCompany()
@@ -651,7 +680,8 @@ export async function createCreditCard(data: {
       bank_name: data.bank_name,
       limit_amount: data.limit_amount,
       cutoff_day: data.cutoff_day,
-      due_day: data.due_day
+      due_day: data.due_day,
+      min_payment_ratio: data.min_payment_ratio !== undefined ? data.min_payment_ratio : 40
     })
 
     if (error) return { error: error.message }
@@ -780,6 +810,135 @@ export async function importCreditCardTransactions(cardId: string, transactionsL
       .eq('id', cardId)
 
     if (updateErr) return { error: `Kredi kartı borcu güncellenemedi: ${updateErr.message}` }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function deleteChequeNote(chequeId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('cheques_notes')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', chequeId)
+      .eq('company_id', companyInfo.id)
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function updateChequeNote(chequeId: string, data: {
+  type: 'cheque' | 'promissory_note'
+  direction: 'in' | 'out'
+  amount: number // in cents
+  issue_date: string
+  due_date: string
+  contact_name: string
+  account_id?: string
+  bank_name?: string
+  document_number?: string
+  notes?: string
+  status?: 'portfolio' | 'endorsed' | 'cashed' | 'bounced'
+}) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('cheques_notes')
+      .update({
+        type: data.type,
+        direction: data.direction,
+        amount: data.amount,
+        issue_date: data.issue_date,
+        due_date: data.due_date,
+        contact_name: data.contact_name,
+        account_id: data.account_id || null,
+        bank_name: data.bank_name || null,
+        document_number: data.document_number || null,
+        notes: data.notes || null,
+        status: data.status || 'portfolio',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', chequeId)
+      .eq('company_id', companyInfo.id)
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function transferChequeNote(chequeId: string, targetAccountId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch cheque details
+    const { data: cheque, error: fetchErr } = await supabase
+      .from('cheques_notes')
+      .select('*')
+      .eq('id', chequeId)
+      .single()
+
+    if (fetchErr || !cheque) return { error: 'Çek/Senet bulunamadı.' }
+
+    // 2. Fetch target account details
+    const { data: account, error: accErr } = await supabase
+      .from('accounts')
+      .select('name, company_name')
+      .eq('id', targetAccountId)
+      .single()
+
+    if (accErr || !account) return { error: 'Alıcı cari hesap bulunamadı.' }
+
+    const supplierName = account.company_name || account.name
+
+    // 3. Update cheque status and append ciro info to notes
+    const newNotes = `${cheque.notes || ''}\n[Ciro Edildi: ${new Date().toLocaleDateString('tr-TR')} - Alıcı: ${supplierName}]`
+    const { error: updateErr } = await supabase
+      .from('cheques_notes')
+      .update({
+        status: 'endorsed',
+        notes: newNotes
+      })
+      .eq('id', chequeId)
+
+    if (updateErr) return { error: `Çek durumu güncellenemedi: ${updateErr.message}` }
+
+    // 4. Create payment_out transaction to the supplier Cari
+    const { error: txErr } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      account_id: targetAccountId,
+      transaction_type: 'payment_out',
+      amount: cheque.amount,
+      description: `${cheque.type === 'cheque' ? 'Çek' : 'Senet'} Ciro Edildi (Evrak No: ${cheque.document_number || 'Bilinmiyor'})`,
+      transaction_date: new Date().toISOString().split('T')[0],
+      payment_method: cheque.type === 'cheque' ? 'Çek' : 'Senet',
+      category: 'payment_out',
+      currency: 'TRY'
+    })
+
+    if (txErr) return { error: `Ciro cari hareketi oluşturulamadı: ${txErr.message}` }
 
     revalidatePath('/finance')
     revalidatePath('/')

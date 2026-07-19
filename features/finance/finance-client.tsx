@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { PageHeader } from '@/components/shared/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip, FileText, Upload, Calendar, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip, FileText, Upload, Calendar, ArrowUpRight, ArrowDownLeft, Pencil, ArrowRightLeft, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -22,7 +22,10 @@ import {
   createCreditCard,
   deleteCreditCard,
   payCreditCardDebt,
-  importCreditCardTransactions
+  importCreditCardTransactions,
+  deleteChequeNote,
+  updateChequeNote,
+  transferChequeNote
 } from './actions'
 import { ChequeCashModal } from './cheque-cash-modal'
 import {
@@ -87,6 +90,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   const [cardLimit, setCardLimit] = useState('')
   const [cardCutoffDay, setCardCutoffDay] = useState('15')
   const [cardDueDay, setCardDueDay] = useState('25')
+  const [cardMinPaymentRatio, setCardMinPaymentRatio] = useState('40')
 
   // Card Payment States
   const [showPayCardModal, setShowPayCardModal] = useState(false)
@@ -97,12 +101,32 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   // Card Statement Upload States
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [selectedUploadCard, setSelectedUploadCard] = useState<any>(null)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadFiles, setUploadFiles] = useState<File[] | null>(null)
   const [parsedCardTx, setParsedCardTx] = useState<any[] | null>(null)
   const [parsingLoading, setParsingLoading] = useState(false)
 
   // Selected Card Details view
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
+
+  // Cheque Edit States
+  const [showEditChequeModal, setShowEditChequeModal] = useState(false)
+  const [selectedEditCheque, setSelectedEditCheque] = useState<any>(null)
+  const [editChequeType, setEditChequeType] = useState<'cheque' | 'promissory_note'>('cheque')
+  const [editChequeDirection, setEditChequeDirection] = useState<'in' | 'out'>('in')
+  const [editChequeAmount, setEditChequeAmount] = useState('')
+  const [editChequeIssueDate, setEditChequeIssueDate] = useState('')
+  const [editChequeDueDate, setEditChequeDueDate] = useState('')
+  const [editChequeContactName, setEditChequeContactName] = useState('')
+  const [editChequeAccountId, setEditChequeAccountId] = useState('')
+  const [editChequeBankName, setEditChequeBankName] = useState('')
+  const [editChequeDocNum, setEditChequeDocNum] = useState('')
+  const [editChequeNotes, setEditChequeNotes] = useState('')
+  const [editChequeStatus, setEditChequeStatus] = useState<any>('portfolio')
+
+  // Cheque Ciro/Transfer States
+  const [showCiroModal, setShowCiroModal] = useState(false)
+  const [selectedCiroCheque, setSelectedCiroCheque] = useState<any>(null)
+  const [ciroAccountId, setCiroAccountId] = useState('')
 
   // Utility to calculate unpaid months for recurring expense
   const getRecurringUnpaidMonths = (startDateStr: string, recurrenceDayVal: number, monthsPaidVal: number) => {
@@ -237,7 +261,8 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         bank_name: cardBankName,
         limit_amount: Math.round(parseFloat(cardLimit) * 100),
         cutoff_day: parseInt(cardCutoffDay),
-        due_day: parseInt(cardDueDay)
+        due_day: parseInt(cardDueDay),
+        min_payment_ratio: parseInt(cardMinPaymentRatio)
       })
 
       if (res && 'error' in res && res.error) {
@@ -247,6 +272,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         setCardName('')
         setCardBankName('')
         setCardLimit('')
+        setCardMinPaymentRatio('40')
         setShowCardModal(false)
       }
     })
@@ -291,16 +317,105 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     })
   }
 
+  // Cheque Actions
+  const handleDeleteCheque = async (chequeId: string) => {
+    if (!confirm('Bu çek/senet kaydını silmek istediğinize emin misiniz?')) return
+
+    try {
+      const res = await deleteChequeNote(chequeId)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Çek/Senet kaydı silindi!')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Silme işlemi başarısız.')
+    }
+  }
+
+  const handleOpenEditCheque = (cheque: any) => {
+    setSelectedEditCheque(cheque)
+    setEditChequeType(cheque.type)
+    setEditChequeDirection(cheque.direction)
+    setEditChequeAmount((cheque.amount / 100).toString())
+    setEditChequeIssueDate(cheque.issue_date)
+    setEditChequeDueDate(cheque.due_date)
+    setEditChequeContactName(cheque.contact_name)
+    setEditChequeAccountId(cheque.account_id || '')
+    setEditChequeBankName(cheque.bank_name || '')
+    setEditChequeDocNum(cheque.document_number || '')
+    setEditChequeNotes(cheque.notes || '')
+    setEditChequeStatus(cheque.status)
+    setShowEditChequeModal(true)
+  }
+
+  const handleUpdateChequeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedEditCheque) return
+    if (!editChequeAmount || parseFloat(editChequeAmount) <= 0) {
+      toast.error('Lütfen geçerli bir tutar girin.')
+      return
+    }
+
+    startTransition(async () => {
+      const res = await updateChequeNote(selectedEditCheque.id, {
+        type: editChequeType,
+        direction: editChequeDirection,
+        amount: Math.round(parseFloat(editChequeAmount) * 100),
+        issue_date: editChequeIssueDate,
+        due_date: editChequeDueDate,
+        contact_name: editChequeContactName,
+        account_id: editChequeAccountId || undefined,
+        bank_name: editChequeBankName || undefined,
+        document_number: editChequeDocNum || undefined,
+        notes: editChequeNotes || undefined,
+        status: editChequeStatus
+      })
+
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Çek/Senet kaydı güncellendi!')
+        setShowEditChequeModal(false)
+      }
+    })
+  }
+
+  const handleOpenCiro = (cheque: any) => {
+    setSelectedCiroCheque(cheque)
+    if (accounts.length > 0) {
+      setCiroAccountId(accounts[0].id)
+    }
+    setShowCiroModal(true)
+  }
+
+  const handleCiroSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedCiroCheque || !ciroAccountId) return
+
+    startTransition(async () => {
+      const res = await transferChequeNote(selectedCiroCheque.id, ciroAccountId)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Çek başarıyla ciro edildi ve cari hesap hareketi kaydedildi!')
+        setShowCiroModal(false)
+      }
+    })
+  }
+
   const handleUploadCCStatement = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!uploadFile || !selectedUploadCard) {
-      toast.error('Lütfen bir PDF ekstre dosyası seçin.')
+    if (!uploadFiles || uploadFiles.length === 0 || !selectedUploadCard) {
+      toast.error('Lütfen en az bir ekstre dosyası seçin.')
       return
     }
 
     setParsingLoading(true)
     const formData = new FormData()
-    formData.append('file', uploadFile)
+    uploadFiles.forEach(file => {
+      formData.append('file', file)
+    })
 
     try {
       const res = await fetch('/api/parse-cc-statement', {
@@ -313,7 +428,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         toast.error(data.error || 'Ekstre çözümlenirken hata oluştu.')
       } else {
         setParsedCardTx(data.transactions || [])
-        toast.success('PDF Ekstre başarıyla analiz edildi, önizleme aşağıda listeleniyor.')
+        toast.success('Ekstreler başarıyla analiz edildi, önizleme aşağıda listeleniyor.')
       }
     } catch (err: any) {
       toast.error(err.message || 'Analiz hatası.')
@@ -332,7 +447,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
       } else {
         toast.success('Kart hareketleri başarıyla aktarıldı ve kart borcu güncellendi!')
         setParsedCardTx(null)
-        setUploadFile(null)
+        setUploadFiles(null)
         setShowUploadModal(false)
       }
     })
@@ -360,6 +475,49 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   const totalLimit = creditCards.reduce((sum, c) => sum + c.limit_amount, 0)
   const totalDebt = creditCards.reduce((sum, c) => sum + c.current_debt, 0)
   const totalAvailableLimit = Math.max(0, totalLimit - totalDebt)
+
+  // Upcoming credit card due & cutoff dates events
+  const getUpcomingCardEvents = () => {
+    const events: { date: Date; type: 'cutoff' | 'due'; cardName: string; bankName: string; formattedDate: string; daysLeft: number }[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    creditCards.forEach(card => {
+      // Cutoff day event
+      let nextCutoff = new Date(today.getFullYear(), today.getMonth(), card.cutoff_day)
+      if (nextCutoff.getTime() < today.getTime()) {
+        nextCutoff = new Date(today.getFullYear(), today.getMonth() + 1, card.cutoff_day)
+      }
+      
+      // Due day event
+      let nextDue = new Date(today.getFullYear(), today.getMonth(), card.due_day)
+      if (nextDue.getTime() < today.getTime()) {
+        nextDue = new Date(today.getFullYear(), today.getMonth() + 1, card.due_day)
+      }
+      
+      events.push({
+        date: nextCutoff,
+        type: 'cutoff',
+        cardName: card.card_name,
+        bankName: card.bank_name,
+        formattedDate: nextCutoff.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
+        daysLeft: Math.ceil((nextCutoff.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      })
+
+      events.push({
+        date: nextDue,
+        type: 'due',
+        cardName: card.card_name,
+        bankName: card.bank_name,
+        formattedDate: nextDue.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
+        daysLeft: Math.ceil((nextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      })
+    })
+
+    return events.sort((a, b) => a.date.getTime() - b.date.getTime())
+  }
+
+  const upcomingCardEvents = getUpcomingCardEvents()
 
   // Label resolvers
   const selectedPayCardSafeName = safes.find(s => s.id === payCardSafeId)?.name || 'Kasa/Banka seçin'
@@ -442,14 +600,40 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                       <CardHeader className="pb-3 border-b bg-muted/20">
                         <CardTitle className="text-sm font-semibold flex items-center justify-between">
                           <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${
-                            cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
-                            cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
-                            {cheque.status === 'portfolio' ? 'Portföyde' :
-                             cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${
+                              cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
+                              cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
+                              cheque.status === 'endorsed' ? 'bg-indigo-100 text-indigo-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {cheque.status === 'portfolio' ? 'Portföyde' :
+                               cheque.status === 'cashed' ? 'Tahsil Edildi' : 
+                               cheque.status === 'endorsed' ? 'Ciro Edildi' : cheque.status}
+                            </span>
+                            
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="h-6 w-6 rounded-full cursor-pointer flex items-center justify-center hover:bg-muted">
+                                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-card border">
+                                <DropdownMenuItem onClick={() => handleOpenEditCheque(cheque)} className="cursor-pointer">
+                                  <Pencil className="w-3.5 h-3.5 mr-2 text-primary" />
+                                  Düzenle
+                                </DropdownMenuItem>
+                                {cheque.status === 'portfolio' && cheque.direction === 'in' && (
+                                  <DropdownMenuItem onClick={() => handleOpenCiro(cheque)} className="cursor-pointer">
+                                    <ArrowRightLeft className="w-3.5 h-3.5 mr-2 text-indigo-600" />
+                                    Ciro Et (Devret)
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => handleDeleteCheque(cheque.id)} className="cursor-pointer text-rose-600 focus:text-rose-600">
+                                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                  Sil
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-4 space-y-2">
@@ -824,6 +1008,47 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
               </Card>
             </div>
 
+            {/* Kredi Kartları Ödeme Takvimi */}
+            {upcomingCardEvents.length > 0 && (
+              <Card className="border-muted bg-card shadow-sm rounded-3xl p-4 overflow-hidden space-y-3">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <span>Kredi Kartı Ödeme & Kesim Takvimi</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                  {upcomingCardEvents.map((evt, idx) => {
+                    const isCutoff = evt.type === 'cutoff'
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`flex-none w-48 p-3 rounded-2xl border flex flex-col justify-between space-y-2 transition-all ${
+                          isCutoff 
+                            ? 'bg-blue-50/50 dark:bg-blue-950/10 border-blue-100 dark:border-blue-900/30' 
+                            : 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/30'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
+                            isCutoff ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40'
+                          }`}>
+                            {isCutoff ? 'Hesap Kesim' : 'Son Ödeme'}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">{evt.formattedDate}</span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs truncate">{evt.cardName}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{evt.bankName}</p>
+                        </div>
+                        <div className="text-[10px] font-semibold text-right text-foreground">
+                          {evt.daysLeft === 0 ? 'Bugün!' : `${evt.daysLeft} Gün Kaldı`}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </Card>
+            )}
+
             {creditCards.length === 0 ? (
               <Card className="border-dashed bg-muted/10">
                 <CardContent className="flex flex-col items-center justify-center h-48 text-muted-foreground">
@@ -879,6 +1104,10 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                           <div>
                             <span className="text-muted-foreground block text-[10px]">Kullanılabilir Limit:</span>
                             <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(avail)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Asgari Ödeme Tutarı (%{card.min_payment_ratio || 40}):</span>
+                            <span className="font-bold text-rose-500">{formatCurrency(Math.round(card.current_debt * ((card.min_payment_ratio || 40) / 100)))}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground block text-[10px]">Kesim / Son Ödeme Günü:</span>
@@ -1401,6 +1630,19 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                   />
                 </div>
               </div>
+              <div className="space-y-1">
+                <Label htmlFor="cardMinRatio" className="text-xs">Asgari Ödeme Oranı (%)</Label>
+                <Input 
+                  type="number"
+                  min="1"
+                  max="100"
+                  id="cardMinRatio"
+                  value={cardMinPaymentRatio}
+                  onChange={(e) => setCardMinPaymentRatio(e.target.value)}
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button type="button" variant="ghost" onClick={() => setShowCardModal(false)} className="rounded-xl">
@@ -1478,7 +1720,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => {
             if (!parsingLoading && !isPending) {
               setParsedCardTx(null)
-              setUploadFile(null)
+              setUploadFiles(null)
               setShowUploadModal(false)
             }
           }} />
@@ -1495,7 +1737,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                 disabled={parsingLoading || isPending}
                 onClick={() => {
                   setParsedCardTx(null)
-                  setUploadFile(null)
+                  setUploadFiles(null)
                   setShowUploadModal(false)
                 }} 
                 className="rounded-full h-8 w-8"
@@ -1509,14 +1751,21 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             </p>
 
             {!parsedCardTx ? (
-              <form onSubmit={handleUploadCCStatement} className="space-y-4">
+              <form onSubmit={handleUploadCCStatement} className="space-y-4 text-left">
                 <div className="space-y-1">
-                  <Label htmlFor="ccFile" className="text-xs font-semibold">Hesap Ekstresi Seçin (PDF)</Label>
+                  <Label htmlFor="ccFile" className="text-xs font-semibold">Hesap Ekstresi Seçin (PDF, Excel, CSV, Resim, Metin)</Label>
                   <Input 
                     type="file" 
                     id="ccFile" 
-                    accept="application/pdf"
-                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    accept="application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/plain,image/*"
+                    multiple={true}
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setUploadFiles(Array.from(e.target.files))
+                      } else {
+                        setUploadFiles(null)
+                      }
+                    }}
                     className="h-10 rounded-lg cursor-pointer"
                     required
                   />
@@ -1525,7 +1774,11 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                   <Button 
                     type="button" 
                     variant="ghost" 
-                    onClick={() => setShowUploadModal(false)}
+                    onClick={() => {
+                      setParsedCardTx(null)
+                      setUploadFiles(null)
+                      setShowUploadModal(false)
+                    }}
                     className="rounded-xl"
                   >
                     Vazgeç
@@ -1610,6 +1863,208 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         safes={safes}
         accounts={accounts}
       />
+
+      {/* Edit Cheque Modal */}
+      {showEditChequeModal && selectedEditCheque && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowEditChequeModal(false)} />
+          <form onSubmit={handleUpdateChequeSubmit} className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] overflow-y-auto text-left">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                <Pencil className="w-5 h-5" />
+                Evrak Düzenle
+              </h3>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setShowEditChequeModal(false)} className="rounded-full h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Evrak Türü</Label>
+                  <Select value={editChequeType} onValueChange={(val: any) => setEditChequeType(val)}>
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      <SelectItem value="cheque">Çek</SelectItem>
+                      <SelectItem value="promissory_note">Senet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">İşlem Yönü</Label>
+                  <Select value={editChequeDirection} onValueChange={(val: any) => setEditChequeDirection(val)}>
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      <SelectItem value="in">Alınan (Giriş)</SelectItem>
+                      <SelectItem value="out">Verilen (Çıkış)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="editAmount" className="text-xs">Tutar (TL)</Label>
+                <Input 
+                  id="editAmount"
+                  type="number"
+                  step="0.01"
+                  value={editChequeAmount}
+                  onChange={(e) => setEditChequeAmount(e.target.value)}
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="editContactName" className="text-xs">Muhatap (Cari İsim)</Label>
+                <Input 
+                  id="editContactName"
+                  value={editChequeContactName}
+                  onChange={(e) => setEditChequeContactName(e.target.value)}
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="editIssueDate" className="text-xs">Düzenleme Tarihi</Label>
+                  <Input 
+                    id="editIssueDate"
+                    type="date"
+                    value={editChequeIssueDate}
+                    onChange={(e) => setEditChequeIssueDate(e.target.value)}
+                    className="h-10 rounded-lg"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="editDueDate" className="text-xs">Vade Tarihi</Label>
+                  <Input 
+                    id="editDueDate"
+                    type="date"
+                    value={editChequeDueDate}
+                    onChange={(e) => setEditChequeDueDate(e.target.value)}
+                    className="h-10 rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="editBankName" className="text-xs">Banka Adı</Label>
+                  <Input 
+                    id="editBankName"
+                    value={editChequeBankName}
+                    onChange={(e) => setEditChequeBankName(e.target.value)}
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="editDocNum" className="text-xs">Belge / Seri No</Label>
+                  <Input 
+                    id="editDocNum"
+                    value={editChequeDocNum}
+                    onChange={(e) => setEditChequeDocNum(e.target.value)}
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Durum</Label>
+                <Select value={editChequeStatus} onValueChange={(val: any) => setEditChequeStatus(val)}>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border">
+                    <SelectItem value="portfolio">Portföyde</SelectItem>
+                    <SelectItem value="endorsed">Ciro Edildi</SelectItem>
+                    <SelectItem value="cashed">Tahsil Edildi / Ödendi</SelectItem>
+                    <SelectItem value="bounced">Karşılıksız / Protestolu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="editNotes" className="text-xs">Notlar</Label>
+                <Input 
+                  id="editNotes"
+                  value={editChequeNotes}
+                  onChange={(e) => setEditChequeNotes(e.target.value)}
+                  className="h-10 rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="ghost" onClick={() => setShowEditChequeModal(false)} className="rounded-xl">
+                İptal
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-xl px-6">
+                {isPending ? 'Kaydediliyor...' : 'Kaydet'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Cheque Ciro / Endorsement Modal */}
+      {showCiroModal && selectedCiroCheque && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowCiroModal(false)} />
+          <form onSubmit={handleCiroSubmit} className="relative bg-card border w-full max-w-sm p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up text-left">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                <ArrowRightLeft className="w-5 h-5" />
+                Çek/Senet Ciro Et (Devret)
+              </h3>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setShowCiroModal(false)} className="rounded-full h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              Evrak: <span className="font-bold text-foreground">{formatCurrency(selectedCiroCheque.amount)} ({selectedCiroCheque.type === 'cheque' ? 'Çek' : 'Senet'})</span>
+            </p>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Ciro Edilecek Cari Hesap (Alıcı/Tedarikçi)</Label>
+                <Select value={ciroAccountId} onValueChange={(val) => setCiroAccountId(val || '')} required>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue>
+                      {accounts.find(a => a.id === ciroAccountId)?.name || 'Cari hesap seçin...'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border">
+                    {accounts.map(acc => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.name} {acc.company_name ? `(${acc.company_name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="ghost" onClick={() => setShowCiroModal(false)} className="rounded-xl">
+                İptal
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-xl px-6 bg-primary text-primary-foreground hover:bg-primary/95">
+                {isPending ? 'Ciro Ediliyor...' : 'Ciro Et'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import * as XLSX from 'xlsx'
 
 export const maxDuration = 60
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY || ''
     if (!apiKey) {
-      return NextResponse.json({ error: 'API anahtarı bulunamadı. Lütfen Vercel üzerinden GEMINI_API_KEY ortam değişkenini ayarlayıp Redeploy edin.' }, { status: 400 })
+      return NextResponse.json({ error: 'API anahtarı bulunamadı. Lütfen GEMINI_API_KEY ortam değişkenini ayarlayın.' }, { status: 400 })
     }
 
     const arrayBuffer = await file.arrayBuffer()
@@ -30,11 +31,11 @@ export async function POST(req: NextRequest) {
 
     const ledgerPrompt = `
       Sen uzman bir muhasebeci ve veri çıkarıcı yapay zekasın. 
-      Sana bir "Cari Hesap Ekstresi" (Ledger/Account Statement) PDF'i veriyorum.
-      Bu PDF'teki tüm işlemleri (satırları) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
+      Sana bir "Cari Hesap Ekstresi" (Ledger/Account Statement) verisi/dosyası veriyorum.
+      Bu verideki tüm işlemleri (satırları) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
-      ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
-      Eğer pdf'te '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
+      ÇOK ÖNEMLİ: Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      Eğer veride '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
       
       Eğer tutar "Borç" (Debit) sütunundaysa "debit_raw" değerine, "Alacak" (Credit) sütunundaysa "credit_raw" değerine yaz. Boşsa veya çizgi varsa "0" yaz.
       
@@ -56,11 +57,11 @@ export async function POST(req: NextRequest) {
 
     const bankPrompt = `
       Sen uzman bir banka hesap ekstresi analizörü yapay zekasın. 
-      Sana bir "Banka Hesap Ekstresi" (Bank Statement) PDF'i veriyorum.
-      Bu PDF'teki tüm işlemleri (hesap hareketleri satırlarını) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
+      Sana bir "Banka Hesap Ekstresi" (Bank Statement) verisi/dosyası veriyorum.
+      Bu verideki tüm işlemleri (hesap hareketleri satırlarını) analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
       
-      ÇOK ÖNEMLİ: Tutarları PDF'te nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
-      Eğer pdf'te '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
+      ÇOK ÖNEMLİ: Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "debit_raw" ve "credit_raw" alanlarına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      Eğer veride '3.486.000,00' yazıyorsa, JSON'a '3.486' YAZMA, eksiksiz olarak '3.486.000,00' yaz. Sondaki veya aradaki hiçbir sıfırı yutma.
       
       Eğer hesaba para GİRDİYSE (Yatan/Alacak/Credit) "credit_raw" alanına yaz, "debit_raw" alanını "0" yap.
       Eğer hesaptan para ÇIKTIYSA (Çekilen/Borç/Debit) "debit_raw" alanına yaz, "credit_raw" alanını "0" yap.
@@ -81,34 +82,72 @@ export async function POST(req: NextRequest) {
       ]
     `
 
-    const prompt = statementType === 'bank' ? bankPrompt : ledgerPrompt;
+    const promptText = statementType === 'bank' ? bankPrompt : ledgerPrompt
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: buffer.toString('base64'),
-          mimeType: file.type || 'application/pdf',
+    let result
+    if (['xlsx', 'xls', 'csv'].includes(ext)) {
+      // Parse spreadsheet to CSV using sheetjs
+      const workbook = XLSX.read(buffer, { type: 'buffer' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const csvData = XLSX.utils.sheet_to_csv(worksheet)
+
+      // Send the spreadsheet content directly as text context
+      result = await model.generateContent([
+        promptText + `\n\nAnaliz Edilecek Excel Verisi (CSV formatında):\n${csvData}`
+      ])
+    } else if (['txt', 'text'].includes(ext)) {
+      const textContent = buffer.toString('utf-8')
+      result = await model.generateContent([
+        promptText + `\n\nAnaliz Edilecek Metin Verisi:\n${textContent}`
+      ])
+    } else {
+      // PDF or Image
+      result = await model.generateContent([
+        promptText,
+        {
+          inlineData: {
+            data: buffer.toString('base64'),
+            mimeType: file.type || 'application/pdf',
+          },
         },
-      },
-    ])
+      ])
+    }
 
     const responseText = result.response.text()
     
     // Clean up markdown json blocks if model added them
     let cleanJson = responseText.trim()
-    if (cleanJson.startsWith('\`\`\`json')) {
-      cleanJson = cleanJson.replace(/\`\`\`json\n?/, '').replace(/\n?\`\`\`$/, '')
-    } else if (cleanJson.startsWith('\`\`\`')) {
-      cleanJson = cleanJson.replace(/\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '')
+    if (cleanJson.startsWith('```json')) {
+      cleanJson = cleanJson.replace(/```json\n?/, '').replace(/\n?```$/, '')
+    } else if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/```\n?/, '').replace(/\n?```$/, '')
     }
 
-    const rawTransactions = JSON.parse(cleanJson)
+    let rawTransactions
+    try {
+      rawTransactions = JSON.parse(cleanJson)
+    } catch (err: any) {
+      console.error('Gemini output is not valid JSON. Raw output:', responseText)
+      return NextResponse.json({ 
+        error: 'Ekstre verileri çözümlenirken geçersiz format oluştu. Lütfen dosyanın net ve okunaklı olduğundan emin olun.',
+        details: err.message 
+      }, { status: 422 })
+    }
+
+    if (!Array.isArray(rawTransactions)) {
+      return NextResponse.json({ error: 'Ekstre çözümlenirken liste formatı alınamadı.' }, { status: 422 })
+    }
 
     function parseAmount(raw: string | number | null | undefined): number {
       if (!raw) return 0;
       if (typeof raw === 'number') return Math.round(raw * 100);
       let str = raw.toString().trim();
+      const isNegative = str.startsWith('-');
+      if (isNegative) {
+        str = str.replace('-', '');
+      }
       if (str === '-' || str === '') return 0;
       
       const dotCount = (str.match(/\./g) || []).length;
@@ -139,7 +178,8 @@ export async function POST(req: NextRequest) {
       str = str.replace(/\s/g, '');
       const num = parseFloat(str);
       if (isNaN(num)) return 0;
-      return Math.round(num * 100);
+      const cents = Math.round(num * 100);
+      return isNegative ? -cents : cents;
     }
 
     const transactions = rawTransactions.map((t: any) => {
@@ -147,10 +187,10 @@ export async function POST(req: NextRequest) {
       let credit = 0;
       
       if ('debit_raw' in t) debit = parseAmount(t.debit_raw);
-      else if ('debit' in t) debit = parseAmount(t.debit); // fallback
+      else if ('debit' in t) debit = parseAmount(t.debit);
 
       if ('credit_raw' in t) credit = parseAmount(t.credit_raw);
-      else if ('credit' in t) credit = parseAmount(t.credit); // fallback
+      else if ('credit' in t) credit = parseAmount(t.credit);
 
       return {
         ...t,
@@ -161,9 +201,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ transactions })
   } catch (error: any) {
-    console.error('PDF Parsing Error:', error)
+    console.error('PDF/Excel Parsing Error:', error)
     return NextResponse.json(
-      { error: 'PDF işlenirken bir hata oluştu', details: error.message },
+      { error: 'Dosya işlenirken sistemsel bir hata oluştu', details: error.message },
       { status: 500 }
     )
   }

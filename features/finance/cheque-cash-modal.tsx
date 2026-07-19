@@ -44,6 +44,10 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
   const [safeId, setSafeId] = useState('')
   const [applyDiscount, setApplyDiscount] = useState(false)
   
+  // Net cash target states
+  const [netTarget, setNetTarget] = useState<'safe' | 'account'>('safe')
+  const [netTargetId, setNetTargetId] = useState('')
+
   // Cost breakdown states (in TL strings)
   const [calcInterestByRate, setCalcInterestByRate] = useState(true)
   const [discountRate, setDiscountRate] = useState('6') // Monthly %
@@ -66,7 +70,9 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
     if (cheque) {
       if (safes.length > 0) {
         setSafeId(safes[0].id)
+        setNetTargetId(safes[0].id)
       }
+      setNetTarget('safe')
       
       // Calculate remaining days
       const today = new Date()
@@ -77,7 +83,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
       const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
       setRemainingDays(diffDays)
 
-      setApplyDiscount(false) // Default to false, let user check it
+      setApplyDiscount(false) // Default to false
       setCalcInterestByRate(true)
       setInterestVal('0.00')
       setCommissionVal('0.00')
@@ -125,18 +131,26 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
       if (expenseTarget === 'account') {
         setExpenseTargetId(cheque.account_id || (accounts[0]?.id ?? ''))
       } else {
-        setExpenseTargetId(safeId)
+        setExpenseTargetId(applyDiscount ? netTargetId : safeId)
       }
     }
-  }, [expenseTarget, safeId, cheque, accounts])
+  }, [expenseTarget, safeId, netTargetId, applyDiscount, cheque, accounts])
 
   if (!isOpen || !cheque) return null
 
   async function handleSave() {
     if (!cheque) return
-    if (!safeId) {
-      toast.error(isIncoming ? 'Lütfen tahsilat yapılacak Kasa/Banka seçin.' : 'Lütfen ödeme yapılacak Kasa/Banka seçin.')
-      return
+    
+    if (applyDiscount) {
+      if (!netTargetId) {
+        toast.error('Lütfen net tutarın aktarılacağı Kasa veya Cari seçin.')
+        return
+      }
+    } else {
+      if (!safeId) {
+        toast.error(isIncoming ? 'Lütfen tahsilat yapılacak Kasa/Banka seçin.' : 'Lütfen ödeme yapılacak Kasa/Banka seçin.')
+        return
+      }
     }
 
     setLoading(true)
@@ -149,6 +163,8 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
         interestAmount: applyDiscount ? Math.round((parseFloat(interestVal) || 0) * 100) : 0,
         commissionAmount: applyDiscount ? Math.round((parseFloat(commissionVal) || 0) * 100) : 0,
         bankExpenseAmount: applyDiscount ? Math.round((parseFloat(bankExpenseVal) || 0) * 100) : 0,
+        netTarget: applyDiscount ? netTarget : 'safe',
+        netTargetId: applyDiscount ? netTargetId : safeId,
         expenseTarget: applyDiscount ? expenseTarget : undefined,
         expenseTargetId: applyDiscount ? expenseTargetId : undefined,
       })
@@ -170,13 +186,19 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
     }
   }
 
-  // Helper selectors for correct naming instead of showing raw UUIDs
+  // Label resolvers
   const selectedSafeName = safes.find(s => s.id === safeId)?.name || 'Kasa/Banka seçin'
+  const selectedNetTargetSafeName = safes.find(s => s.id === netTargetId)?.name || 'Kasa/Banka seçin'
   const selectedExpenseTargetSafeName = safes.find(s => s.id === expenseTargetId)?.name || 'Kasa seçin'
   
   const currentAccount = accounts.find(a => a.id === expenseTargetId)
   const selectedExpenseTargetAccountName = currentAccount 
     ? `${currentAccount.name} ${currentAccount.company_name ? `(${currentAccount.company_name})` : ''}`
+    : 'Cari hesap seçin'
+
+  const netAcc = accounts.find(a => a.id === netTargetId)
+  const selectedNetTargetAccountName = netAcc
+    ? `${netAcc.name} ${netAcc.company_name ? `(${netAcc.company_name})` : ''}`
     : 'Cari hesap seçin'
 
   return (
@@ -199,21 +221,79 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
         </div>
 
         <div className="space-y-4">
-          <div className="space-y-1">
-            <Label className="text-xs">
-              {isIncoming ? 'Tahsil Edilecek Kasa / Banka' : 'Ödemenin Çıkacağı Kasa / Banka'}
-            </Label>
-            <Select value={safeId} onValueChange={(val) => setSafeId(val || '')} required>
-              <SelectTrigger className="h-10 rounded-lg">
-                <SelectValue>{selectedSafeName}</SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-card border">
-                {safes.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!applyDiscount ? (
+            <div className="space-y-1 animate-in-up">
+              <Label className="text-xs">
+                {isIncoming ? 'Tahsil Edilecek Kasa / Banka' : 'Ödemenin Çıkacağı Kasa / Banka'}
+              </Label>
+              <Select value={safeId} onValueChange={(val) => setSafeId(val || '')} required>
+                <SelectTrigger className="h-10 rounded-lg">
+                  <SelectValue>{selectedSafeName}</SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-card border">
+                  {safes.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 animate-in-up text-left">
+              <div className="space-y-1">
+                <Label className="text-xs">Net Paranın Gireceği Yer</Label>
+                <Select 
+                  value={netTarget} 
+                  onValueChange={(val: any) => {
+                    setNetTarget(val)
+                    if (val === 'safe') setNetTargetId(safes[0]?.id || '')
+                    else setNetTargetId(accounts[0]?.id || '')
+                  }}
+                >
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue>
+                      {netTarget === 'safe' ? 'Kasa / Banka' : 'Cari Hesap'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border">
+                    <SelectItem value="safe">Kasa / Banka</SelectItem>
+                    <SelectItem value="account">Cari Hesap</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {netTarget === 'safe' ? (
+                <div className="space-y-1">
+                  <Label className="text-xs">Alıcı Kasa/Banka</Label>
+                  <Select value={netTargetId} onValueChange={(val) => setNetTargetId(val || '')}>
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue>{selectedNetTargetSafeName}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      {safes.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-xs">Alıcı Cari Hesap</Label>
+                  <Select value={netTargetId} onValueChange={(val) => setNetTargetId(val || '')}>
+                    <SelectTrigger className="h-10 rounded-lg">
+                      <SelectValue>{selectedNetTargetAccountName}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          {acc.name} {acc.company_name ? `(${acc.company_name})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 py-2 border-t border-b border-dashed">
             <input 
@@ -386,7 +466,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px]">Toplam Masraf:</span>
-                  <strong className={`text-xs ${isIncoming ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  <strong className="text-xs text-rose-500">
                     {formatCurrency(discountAmount)}
                   </strong>
                 </div>
@@ -394,7 +474,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                   <span className="text-muted-foreground block text-[10px]">
                     {isIncoming ? 'Net Tahsilat:' : 'Net Ödeme:'}
                   </span>
-                  <strong className="text-xs text-primary font-bold">{formatCurrency(netAmount)}</strong>
+                  <strong className="text-xs text-emerald-500 font-bold">{formatCurrency(netAmount)}</strong>
                 </div>
               </div>
             </div>

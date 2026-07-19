@@ -58,6 +58,8 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
   const [bankExpenseVal, setBankExpenseVal] = useState('0.00')
 
   const [chequeSafeId, setChequeSafeId] = useState<string>('')
+  const [netTarget, setNetTarget] = useState<'safe' | 'account'>('safe')
+  const [netTargetId, setNetTargetId] = useState('')
   const [expenseTarget, setExpenseTarget] = useState<'safe' | 'account'>('safe')
   const [expenseTargetId, setExpenseTargetId] = useState('')
 
@@ -71,10 +73,11 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
 
   // Initialize cheque safe defaults
   useEffect(() => {
-    if (safes.length > 0 && !chequeSafeId) {
-      setChequeSafeId(safes[0].id)
+    if (safes.length > 0) {
+      if (!chequeSafeId) setChequeSafeId(safes[0].id)
+      if (!netTargetId) setNetTargetId(safes[0].id)
     }
-  }, [safes, chequeSafeId])
+  }, [safes, chequeSafeId, netTargetId])
 
   // Sync target when chequeSafeId changes
   useEffect(() => {
@@ -146,8 +149,8 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
           setLoading(false)
           return
         }
-        if (applyDiscount && !chequeSafeId) {
-          toast.error('Vade farkı kırdırma işlemi için tahsil edilecek Kasa/Banka seçmelisiniz.')
+        if (applyDiscount && !netTargetId) {
+          toast.error('Vade farkı kırdırma işlemi için net tutarın aktarılacağı Kasa veya Cari seçmelisiniz.')
           setLoading(false)
           return
         }
@@ -169,6 +172,8 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
           interest_amount: applyDiscount ? Math.round((parseFloat(interestVal) || 0) * 100) : undefined,
           commission_amount: applyDiscount ? Math.round((parseFloat(commissionVal) || 0) * 100) : undefined,
           bank_expense_amount: applyDiscount ? Math.round((parseFloat(bankExpenseVal) || 0) * 100) : undefined,
+          net_target: applyDiscount ? netTarget : undefined,
+          net_target_id: applyDiscount ? netTargetId : undefined,
           expense_target: applyDiscount ? expenseTarget : undefined,
           expense_target_id: applyDiscount ? expenseTargetId : undefined,
           safe_id: applyDiscount ? chequeSafeId : undefined,
@@ -235,6 +240,13 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
   const selectedToSafeName = safes.find(s => s.id === toSafeId)?.name || 'Alıcı kasa seçin...'
 
   const selectedChequeSafeName = safes.find(s => s.id === chequeSafeId)?.name || 'Kasa/Banka seçin'
+  const selectedNetTargetSafeName = safes.find(s => s.id === netTargetId)?.name || 'Kasa/Banka seçin'
+  
+  const netAcc = accounts.find(a => a.id === netTargetId)
+  const selectedNetTargetAccountName = netAcc 
+    ? `${netAcc.name} ${netAcc.company_name ? `(${netAcc.company_name})` : ''}` 
+    : 'Cari hesap seçin'
+
   const selectedExpenseTargetSafeName = safes.find(s => s.id === expenseTargetId)?.name || 'Kasa seçin'
   
   const expAcc = accounts.find(a => a.id === expenseTargetId)
@@ -385,19 +397,61 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
 
                 {applyDiscount && (
                   <div className="space-y-4 animate-in-up text-xs">
-                    {/* Safe Select for net cash entry */}
-                    <div className="space-y-1 text-left">
-                      <Label className="text-xs">Net Paranın Gireceği Kasa / Banka</Label>
-                      <Select value={chequeSafeId} onValueChange={(val) => setChequeSafeId(val || '')} required>
-                        <SelectTrigger className="h-10 rounded-lg">
-                          <SelectValue>{selectedChequeSafeName}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border">
-                          {safes.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {/* Net Target (Safe or Cari) Selector */}
+                    <div className="grid grid-cols-2 gap-3 text-left">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Net Paranın Gireceği Yer</Label>
+                        <Select 
+                          value={netTarget} 
+                          onValueChange={(val: any) => {
+                            setNetTarget(val)
+                            if (val === 'safe') setNetTargetId(safes[0]?.id || '')
+                            else setNetTargetId(accounts[0]?.id || '')
+                          }}
+                        >
+                          <SelectTrigger className="h-10 rounded-lg">
+                            <SelectValue>
+                              {netTarget === 'safe' ? 'Kasa / Banka' : 'Cari Hesap'}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border">
+                            <SelectItem value="safe">Kasa / Banka</SelectItem>
+                            <SelectItem value="account">Cari Hesap</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {netTarget === 'safe' ? (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Alıcı Kasa/Banka</Label>
+                          <Select value={netTargetId} onValueChange={(val) => setNetTargetId(val || '')}>
+                            <SelectTrigger className="h-10 rounded-lg">
+                              <SelectValue>{selectedNetTargetSafeName}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border">
+                              {safes.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Alıcı Cari Hesap</Label>
+                          <Select value={netTargetId} onValueChange={(val) => setNetTargetId(val || '')}>
+                            <SelectTrigger className="h-10 rounded-lg">
+                              <SelectValue>{selectedNetTargetAccountName}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border">
+                              {accounts.map(acc => (
+                                <SelectItem key={acc.id} value={acc.id}>
+                                  {acc.name} {acc.company_name ? `(${acc.company_name})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
 
                     {/* Detailed Kırdırma Masrafları Form */}
