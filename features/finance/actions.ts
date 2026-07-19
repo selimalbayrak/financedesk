@@ -426,12 +426,12 @@ export async function cashChequeNote(data: {
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           account_id: data.expenseTargetId,
-          transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+          transaction_type: 'payment_out', // Always payment_out for deductions/masraf
           amount: discountAmount,
           description: descText,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
-          category: isIncoming ? 'payment_out' : 'payment_in',
+          category: 'payment_out',
           currency: 'TRY'
         })
         if (expError) return { error: `Müşteri borç/alacak yansıtma kaydı oluşturulamadı: ${expError.message}` }
@@ -441,12 +441,12 @@ export async function cashChequeNote(data: {
         const { error: expError } = await supabase.from('transactions').insert({
           company_id: companyInfo.id,
           safe_id: targetSafeId,
-          transaction_type: isIncoming ? 'payment_out' : 'payment_in',
+          transaction_type: 'payment_out', // Always payment_out for deductions/masraf
           amount: discountAmount,
           description: descText,
           transaction_date: today.toISOString().split('T')[0],
           payment_method: 'Nakit',
-          category: isIncoming ? 'payment_out' : 'payment_in',
+          category: 'payment_out',
           currency: 'TRY'
         })
         if (expError) return { error: `Vade farkı gider/gelir kaydı oluşturulamadı: ${expError.message}` }
@@ -625,6 +625,164 @@ export async function deleteFactoryExpense(expenseId: string) {
 
     if (error) return { error: error.message }
     revalidatePath('/finance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function createCreditCard(data: {
+  card_name: string
+  card_type: 'personal' | 'company'
+  bank_name: string
+  limit_amount: number // in cents
+  cutoff_day: number
+  due_day: number
+}) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase.from('credit_cards').insert({
+      company_id: companyInfo.id,
+      card_name: data.card_name,
+      card_type: data.card_type,
+      bank_name: data.bank_name,
+      limit_amount: data.limit_amount,
+      cutoff_day: data.cutoff_day,
+      due_day: data.due_day
+    })
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function deleteCreditCard(cardId: string) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+      .from('credit_cards')
+      .delete()
+      .eq('id', cardId)
+      .eq('company_id', companyInfo.id)
+
+    if (error) return { error: error.message }
+    revalidatePath('/finance')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function payCreditCardDebt(cardId: string, safeId: string, amount: number) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Fetch card details
+    const { data: card, error: fetchErr } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('id', cardId)
+      .single()
+
+    if (fetchErr || !card) return { error: 'Kredi kartı bulunamadı.' }
+
+    const today = new Date().toISOString().split('T')[0]
+
+    // 2. Create card payment transaction (negative amount since it reduces debt)
+    const { error: ccTxErr } = await supabase.from('credit_card_transactions').insert({
+      card_id: cardId,
+      transaction_date: today,
+      description: 'Kredi Kartı Borç Ödemesi',
+      amount: -amount // reduces debt
+    })
+
+    if (ccTxErr) return { error: `Kart hareket kaydı oluşturulamadı: ${ccTxErr.message}` }
+
+    // 3. Create safe outflow transaction (money leaving safe)
+    const { error: safeTxErr } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      safe_id: safeId,
+      transaction_type: 'payment_out',
+      amount: amount,
+      description: `${card.bank_name} - ${card.card_name} Kredi Kartı Ödemesi`,
+      transaction_date: today,
+      payment_method: 'Havale/EFT',
+      category: 'payment_out',
+      currency: 'TRY'
+    })
+
+    if (safeTxErr) return { error: `Kasa ödeme kaydı oluşturulamadı: ${safeTxErr.message}` }
+
+    // 4. Update current debt
+    const { error: updateErr } = await supabase
+      .from('credit_cards')
+      .update({
+        current_debt: Math.max(0, card.current_debt - amount)
+      })
+      .eq('id', cardId)
+
+    if (updateErr) return { error: `Kart bakiyesi güncellenemedi: ${updateErr.message}` }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Bilinmeyen bir hata oluştu.' }
+  }
+}
+
+export async function importCreditCardTransactions(cardId: string, transactionsList: Array<{ transaction_date: string; description: string; amount: number }>) {
+  try {
+    const companyInfo = await getActiveCompany()
+    if (!companyInfo) return { error: 'Şirket bulunamadı.' }
+
+    const supabase = await createClient()
+
+    // 1. Insert transactions
+    const rows = transactionsList.map(t => ({
+      card_id: cardId,
+      transaction_date: t.transaction_date,
+      description: t.description,
+      amount: t.amount // positive is spending, negative is payment/refund
+    }))
+
+    const { error: insertErr } = await supabase.from('credit_card_transactions').insert(rows)
+    if (insertErr) return { error: `Kart hareketleri eklenemedi: ${insertErr.message}` }
+
+    // 2. Fetch the card details to update current_debt
+    const { data: card, error: fetchErr } = await supabase
+      .from('credit_cards')
+      .select('current_debt')
+      .eq('id', cardId)
+      .single()
+
+    if (fetchErr || !card) return { error: 'Kredi kartı bulunamadı.' }
+
+    // Sum all transaction amounts
+    const netTransactionDebt = transactionsList.reduce((sum, t) => sum + t.amount, 0)
+    const newDebt = Math.max(0, card.current_debt + netTransactionDebt)
+
+    const { error: updateErr } = await supabase
+      .from('credit_cards')
+      .update({ current_debt: newDebt })
+      .eq('id', cardId)
+
+    if (updateErr) return { error: `Kredi kartı borcu güncellenemedi: ${updateErr.message}` }
+
+    revalidatePath('/finance')
+    revalidatePath('/')
     return { success: true }
   } catch (err: any) {
     return { error: err.message || 'Bilinmeyen bir hata oluştu.' }

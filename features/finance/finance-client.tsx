@@ -3,7 +3,7 @@
 import React, { useState, useTransition } from 'react'
 import { PageHeader } from '@/components/shared/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip } from 'lucide-react'
+import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip, FileText, Upload, Calendar, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -18,7 +18,11 @@ import {
   createFactoryExpense, 
   payFactoryExpense, 
   payRecurringFactoryExpense,
-  deleteFactoryExpense 
+  deleteFactoryExpense,
+  createCreditCard,
+  deleteCreditCard,
+  payCreditCardDebt,
+  importCreditCardTransactions
 } from './actions'
 import { ChequeCashModal } from './cheque-cash-modal'
 import {
@@ -39,6 +43,8 @@ interface FinanceClientProps {
   safes: any[]
   accounts: any[]
   expenses: any[]
+  creditCards?: any[]
+  cardTransactions?: any[]
   companyName?: string
 }
 
@@ -52,7 +58,7 @@ const EXPENSE_TYPE_LABELS: Record<string, string> = {
   Other: 'Diğer Fabrika Gideri'
 }
 
-export function FinanceClient({ cheques, loans, installments, safes, accounts, expenses, companyName }: FinanceClientProps) {
+export function FinanceClient({ cheques, loans, installments, safes, accounts, expenses, creditCards = [], cardTransactions = [], companyName }: FinanceClientProps) {
   const [activeTab, setActiveTab] = useState('cheques')
   const [isPending, startTransition] = useTransition()
   
@@ -72,6 +78,31 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   const [recurrenceDay, setRecurrenceDay] = useState('10')
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
   const [attachmentUrl, setAttachmentUrl] = useState('')
+
+  // Credit Card Dialog States
+  const [showCardModal, setShowCardModal] = useState(false)
+  const [cardName, setCardName] = useState('')
+  const [cardType, setCardType] = useState<'personal' | 'company'>('company')
+  const [cardBankName, setCardBankName] = useState('')
+  const [cardLimit, setCardLimit] = useState('')
+  const [cardCutoffDay, setCardCutoffDay] = useState('15')
+  const [cardDueDay, setCardDueDay] = useState('25')
+
+  // Card Payment States
+  const [showPayCardModal, setShowPayCardModal] = useState(false)
+  const [selectedPayCard, setSelectedPayCard] = useState<any>(null)
+  const [payCardSafeId, setPayCardSafeId] = useState('')
+  const [payCardAmount, setPayCardAmount] = useState('')
+
+  // Card Statement Upload States
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [selectedUploadCard, setSelectedUploadCard] = useState<any>(null)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [parsedCardTx, setParsedCardTx] = useState<any[] | null>(null)
+  const [parsingLoading, setParsingLoading] = useState(false)
+
+  // Selected Card Details view
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
 
   // Utility to calculate unpaid months for recurring expense
   const getRecurringUnpaidMonths = (startDateStr: string, recurrenceDayVal: number, monthsPaidVal: number) => {
@@ -191,10 +222,125 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     }
   }
 
-  // Live calculation of totals
+  // Credit Card Actions
+  const handleCreateCard = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cardLimit || parseFloat(cardLimit) <= 0) {
+      toast.error('Lütfen geçerli bir limit girin.')
+      return
+    }
+
+    startTransition(async () => {
+      const res = await createCreditCard({
+        card_name: cardName,
+        card_type: cardType,
+        bank_name: cardBankName,
+        limit_amount: Math.round(parseFloat(cardLimit) * 100),
+        cutoff_day: parseInt(cardCutoffDay),
+        due_day: parseInt(cardDueDay)
+      })
+
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Kredi kartı başarıyla tanımlandı!')
+        setCardName('')
+        setCardBankName('')
+        setCardLimit('')
+        setShowCardModal(false)
+      }
+    })
+  }
+
+  const handleDeleteCard = async (cardId: string) => {
+    if (!confirm('Bu kredi kartını ve tüm kart hareketlerini silmek istediğinize emin misiniz?')) return
+
+    try {
+      const res = await deleteCreditCard(cardId)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Kredi kartı silindi!')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Silme işlemi başarısız.')
+    }
+  }
+
+  const handlePayCardDebt = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!payCardAmount || parseFloat(payCardAmount) <= 0 || !payCardSafeId) {
+      toast.error('Lütfen geçerli kasa ve tutar girin.')
+      return
+    }
+
+    startTransition(async () => {
+      const res = await payCreditCardDebt(
+        selectedPayCard.id,
+        payCardSafeId,
+        Math.round(parseFloat(payCardAmount) * 100)
+      )
+
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Ödeme işlemi başarıyla tamamlandı, kasa ve kart bakiye hareketleri işlendi!')
+        setPayCardAmount('')
+        setShowPayCardModal(false)
+      }
+    })
+  }
+
+  const handleUploadCCStatement = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!uploadFile || !selectedUploadCard) {
+      toast.error('Lütfen bir PDF ekstre dosyası seçin.')
+      return
+    }
+
+    setParsingLoading(true)
+    const formData = new FormData()
+    formData.append('file', uploadFile)
+
+    try {
+      const res = await fetch('/api/parse-cc-statement', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        toast.error(data.error || 'Ekstre çözümlenirken hata oluştu.')
+      } else {
+        setParsedCardTx(data.transactions || [])
+        toast.success('PDF Ekstre başarıyla analiz edildi, önizleme aşağıda listeleniyor.')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Analiz hatası.')
+    } finally {
+      setParsingLoading(false)
+    }
+  }
+
+  const handleSaveCCStatement = async () => {
+    if (!parsedCardTx || parsedCardTx.length === 0 || !selectedUploadCard) return
+
+    startTransition(async () => {
+      const res = await importCreditCardTransactions(selectedUploadCard.id, parsedCardTx)
+      if (res && 'error' in res && res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Kart hareketleri başarıyla aktarıldı ve kart borcu güncellendi!')
+        setParsedCardTx(null)
+        setUploadFile(null)
+        setShowUploadModal(false)
+      }
+    })
+  }
+
+  // Live calculation of expense totals
   let totalUnpaidExpenses = 0
   let totalPaidExpenses = 0
-
   expenses.forEach(e => {
     if (e.is_recurring) {
       const unpaidMonths = getRecurringUnpaidMonths(e.start_date, e.recurrence_day, e.months_paid)
@@ -210,6 +356,14 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     }
   })
 
+  // Live calculation of CC totals
+  const totalLimit = creditCards.reduce((sum, c) => sum + c.limit_amount, 0)
+  const totalDebt = creditCards.reduce((sum, c) => sum + c.current_debt, 0)
+  const totalAvailableLimit = Math.max(0, totalLimit - totalDebt)
+
+  // Label resolvers
+  const selectedPayCardSafeName = safes.find(s => s.id === payCardSafeId)?.name || 'Kasa/Banka seçin'
+
   return (
     <div className="space-y-6 pb-24 animate-in-up">
       {/* Screen layout */}
@@ -217,7 +371,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         <div className="flex items-center justify-between">
           <PageHeader
             title="Finansman"
-            description="Çek, senet, kredi ve fabrika giderleri takibi"
+            description="Çek, senet, kredi, kart ve fabrika giderleri takibi"
           />
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-xl h-9">
@@ -225,13 +379,18 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
               Rapor Yazdır
             </Button>
             {activeTab === 'expenses' ? (
-              <Button size="sm" onClick={() => setShowExpenseModal(true)} className="rounded-xl h-9">
+              <Button size="sm" onClick={() => setShowExpenseModal(true)} className="rounded-xl h-9 cursor-pointer">
                 <Plus className="w-4 h-4 mr-2" />
                 Yeni Gider Ekle
               </Button>
+            ) : activeTab === 'credit_cards' ? (
+              <Button size="sm" onClick={() => setShowCardModal(true)} className="rounded-xl h-9 cursor-pointer">
+                <Plus className="w-4 h-4 mr-2" />
+                Yeni Kart Ekle
+              </Button>
             ) : (
               <Link href={activeTab === 'cheques' ? '/finance/cheques/new' : '/finance/loans/new'}>
-                <Button size="sm" className="rounded-xl h-9">
+                <Button size="sm" className="rounded-xl h-9 cursor-pointer">
                   <Plus className="w-4 h-4 mr-2" />
                   {activeTab === 'cheques' ? 'Yeni Çek/Senet' : 'Yeni Kredi'}
                 </Button>
@@ -241,7 +400,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-3 h-14 rounded-2xl bg-muted/50 p-1">
+          <TabsList className="w-full grid grid-cols-4 h-14 rounded-2xl bg-muted/50 p-1">
             <TabsTrigger value="cheques" className="rounded-xl h-full data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <CreditCard className="w-4 h-4 mr-2" />
               Çek ve Senetler
@@ -253,6 +412,10 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             <TabsTrigger value="expenses" className="rounded-xl h-full data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Building className="w-4 h-4 mr-2" />
               Fabrika Giderleri
+            </TabsTrigger>
+            <TabsTrigger value="credit_cards" className="rounded-xl h-full data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Kredi Kartları
             </TabsTrigger>
           </TabsList>
 
@@ -631,6 +794,195 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
               </Card>
             )}
           </TabsContent>
+
+          {/* Credit Cards Tab */}
+          <TabsContent value="credit_cards" className="mt-6 space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-blue-50 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900/30">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Toplam Kart Limiti</p>
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400 tabular-nums">
+                    {formatCurrency(totalLimit)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-rose-50 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/30">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Toplam Kart Borcu</p>
+                  <p className="text-xl font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                    {formatCurrency(totalDebt)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-emerald-50 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/30">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Kullanılabilir Limit</p>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    {formatCurrency(totalAvailableLimit)}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {creditCards.length === 0 ? (
+              <Card className="border-dashed bg-muted/10">
+                <CardContent className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                  <CreditCard className="w-12 h-12 mb-4 opacity-20" />
+                  <p>Henüz tanımlanmış kredi kartı bulunmuyor.</p>
+                  <Button variant="outline" className="mt-4 cursor-pointer" onClick={() => setShowCardModal(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Yeni Kredi Kartı Ekle
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {creditCards.map(card => {
+                  const isExpanded = expandedCardId === card.id
+                  const cardTx = cardTransactions.filter(tx => tx.card_id === card.id)
+                  
+                  // Limit calculation
+                  const avail = Math.max(0, card.limit_amount - card.current_debt)
+                  const debtPercent = Math.min(100, Math.round((card.current_debt / card.limit_amount) * 100))
+
+                  return (
+                    <Card key={card.id} className="shadow-sm border-muted overflow-hidden">
+                      <div className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-r from-background via-background to-muted/20">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold uppercase bg-primary/10 text-primary">
+                              {card.card_type === 'personal' ? 'Bireysel Kart' : 'Şirket Kartı'}
+                            </span>
+                            <span className="text-xs text-muted-foreground font-semibold">{card.bank_name}</span>
+                          </div>
+                          <h3 className="font-extrabold text-lg text-foreground">{card.card_name}</h3>
+                          
+                          {/* Progress bar */}
+                          <div className="space-y-1 max-w-sm">
+                            <div className="flex justify-between text-[11px] text-muted-foreground">
+                              <span>Borç: {formatCurrency(card.current_debt)}</span>
+                              <span>Limit: {formatCurrency(card.limit_amount)}</span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  debtPercent > 85 ? 'bg-rose-500' : debtPercent > 50 ? 'bg-amber-500' : 'bg-primary'
+                                }`} 
+                                style={{ width: `${debtPercent}%` }} 
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Middle Info */}
+                        <div className="grid grid-cols-2 md:grid-cols-1 gap-2 text-xs md:text-right shrink-0">
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Kullanılabilir Limit:</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(avail)}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">Kesim / Son Ödeme Günü:</span>
+                            <span className="font-medium">Her ayın {card.cutoff_day}'ü / {card.due_day}'si</span>
+                          </div>
+                        </div>
+
+                        {/* Actions block */}
+                        <div className="flex items-center gap-2 justify-end">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 text-xs rounded-xl cursor-pointer text-primary hover:bg-primary/5"
+                            onClick={() => {
+                              setSelectedPayCard(card)
+                              setShowPayCardModal(true)
+                            }}
+                          >
+                            Ödeme Yap
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 text-xs rounded-xl cursor-pointer"
+                            onClick={() => {
+                              setSelectedUploadCard(card)
+                              setShowUploadModal(true)
+                            }}
+                          >
+                            <Upload className="w-3.5 h-3.5 mr-1.5" />
+                            Ekstre Yükle (PDF)
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 text-xs rounded-xl cursor-pointer"
+                            onClick={() => setExpandedCardId(isExpanded ? null : card.id)}
+                          >
+                            {isExpanded ? 'Detayları Gizle' : 'Kart Hareketleri'}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteCard(card.id)}
+                            className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Collapsible card ledger details */}
+                      {isExpanded && (
+                        <div className="border-t bg-muted/10 p-4 space-y-3 animate-in-up">
+                          <p className="font-bold text-xs uppercase text-primary tracking-wide">Aylık Kart Hareketleri Ledger</p>
+                          {cardTx.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-4 text-center">Bu karta ait henüz bir hareket kaydı bulunmuyor. PDF Hesap ekstresi yükleyebilirsiniz.</p>
+                          ) : (
+                            <div className="overflow-x-auto rounded-xl border bg-card">
+                              <table className="w-full text-xs text-left">
+                                <thead className="bg-muted/40 uppercase font-semibold text-muted-foreground">
+                                  <tr>
+                                    <th className="px-4 py-2">Tarih</th>
+                                    <th className="px-4 py-2">Açıklama</th>
+                                    <th className="px-4 py-2 text-right">Tutar</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                  {cardTx.map(tx => {
+                                    const isPayment = tx.amount < 0
+                                    return (
+                                      <tr key={tx.id} className="hover:bg-muted/30">
+                                        <td className="px-4 py-2 font-medium whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
+                                        <td className="px-4 py-2">{tx.description}</td>
+                                        <td className={`px-4 py-2 text-right font-semibold whitespace-nowrap flex items-center justify-end gap-1.5 ${
+                                          isPayment ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                        }`}>
+                                          {isPayment ? (
+                                            <>
+                                              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
+                                              -{formatCurrency(Math.abs(tx.amount))} (Ödeme/İade)
+                                            </>
+                                          ) : (
+                                            <>
+                                              <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
+                                              {formatCurrency(tx.amount)} (Harcama)
+                                            </>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -760,6 +1112,39 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                     </tr>
                   )
                 })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Credit Cards section in Print */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-bold border-b pb-1 uppercase">4. Kredi Kartları Durumu</h3>
+          <table className="w-full text-xs border-collapse border border-gray-400">
+            <thead>
+              <tr className="bg-gray-100 font-bold">
+                <th className="border border-gray-400 px-2 py-1.5 text-left">Kart Adı</th>
+                <th className="border border-gray-400 px-2 py-1.5 text-left">Banka</th>
+                <th className="border border-gray-400 px-2 py-1.5 text-left">Tür</th>
+                <th className="border border-gray-400 px-2 py-1.5 text-right">Limit</th>
+                <th className="border border-gray-400 px-2 py-1.5 text-right">Güncel Borç</th>
+              </tr>
+            </thead>
+            <tbody>
+              {creditCards.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="border border-gray-400 text-center py-2 text-gray-500">Kredi kartı kaydı bulunmuyor.</td>
+                </tr>
+              ) : (
+                creditCards.map(card => (
+                  <tr key={card.id}>
+                    <td className="border border-gray-400 px-2 py-1 font-semibold">{card.card_name}</td>
+                    <td className="border border-gray-400 px-2 py-1">{card.bank_name}</td>
+                    <td className="border border-gray-400 px-2 py-1">{card.card_type === 'personal' ? 'Bireysel' : 'Şirket'}</td>
+                    <td className="border border-gray-400 px-2 py-1 text-right">{formatCurrency(card.limit_amount)}</td>
+                    <td className="border border-gray-400 px-2 py-1 text-right font-semibold">{formatCurrency(card.current_debt)}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -923,6 +1308,297 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* New Credit Card Modal */}
+      {showCardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowCardModal(false)} />
+          <form onSubmit={handleCreateCard} className="relative bg-card border w-full max-w-sm p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Yeni Kredi Kartı Ekle
+              </h3>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setShowCardModal(false)} className="rounded-full h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="cardName" className="text-xs">Kart Adı (Açıklama)</Label>
+                <Input 
+                  id="cardName"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value)}
+                  placeholder="örn: Şirket Bonus Kartı, Bireysel Maximum"
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cardBankName" className="text-xs">Banka Adı</Label>
+                <Input 
+                  id="cardBankName"
+                  value={cardBankName}
+                  onChange={(e) => setCardBankName(e.target.value)}
+                  placeholder="örn: Yapı Kredi, Garanti BBVA"
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Kart Türü</Label>
+                <Select value={cardType} onValueChange={(val: any) => setCardType(val)}>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue>{cardType === 'personal' ? 'Bireysel Kredi Kartı' : 'Şirket Kredi Kartı'}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border">
+                    <SelectItem value="personal">Bireysel Kredi Kartı</SelectItem>
+                    <SelectItem value="company">Şirket Kredi Kartı</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cardLimit" className="text-xs">Limit (TL)</Label>
+                <Input 
+                  type="number"
+                  step="0.01"
+                  id="cardLimit"
+                  value={cardLimit}
+                  onChange={(e) => setCardLimit(e.target.value)}
+                  placeholder="0,00"
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="cardCutoffDay" className="text-xs">Hesap Kesim Günü</Label>
+                  <Input 
+                    type="number"
+                    min="1"
+                    max="31"
+                    id="cardCutoffDay"
+                    value={cardCutoffDay}
+                    onChange={(e) => setCardCutoffDay(e.target.value)}
+                    className="h-10 rounded-lg"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="cardDueDay" className="text-xs">Son Ödeme Günü</Label>
+                  <Input 
+                    type="number"
+                    min="1"
+                    max="31"
+                    id="cardDueDay"
+                    value={cardDueDay}
+                    onChange={(e) => setCardDueDay(e.target.value)}
+                    className="h-10 rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="ghost" onClick={() => setShowCardModal(false)} className="rounded-xl">
+                İptal
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-xl px-6">
+                {isPending ? 'Kaydediliyor...' : 'Kartı Kaydet'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Credit Card Payment Modal */}
+      {showPayCardModal && selectedPayCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowPayCardModal(false)} />
+          <form onSubmit={handlePayCardDebt} className="relative bg-card border w-full max-w-sm p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                <Check className="w-5 h-5 text-emerald-500" />
+                Borç Ödeme Girişi
+              </h3>
+              <Button type="button" variant="ghost" size="icon" onClick={() => setShowPayCardModal(false)} className="rounded-full h-8 w-8">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground font-medium">
+              Kart: <span className="font-bold text-foreground">{selectedPayCard.bank_name} - {selectedPayCard.card_name}</span><br />
+              Güncel Borç: <span className="font-bold text-rose-500">{formatCurrency(selectedPayCard.current_debt)}</span>
+            </p>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Ödemenin Çıkacağı Kasa / Banka</Label>
+                <Select value={payCardSafeId} onValueChange={(val) => setPayCardSafeId(val || '')} required>
+                  <SelectTrigger className="h-10 rounded-lg">
+                    <SelectValue>{selectedPayCardSafeName}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border">
+                    {safes.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="payCardAmount" className="text-xs">Ödeme Tutarı (TL)</Label>
+                <Input 
+                  type="number"
+                  step="0.01"
+                  id="payCardAmount"
+                  value={payCardAmount}
+                  onChange={(e) => setPayCardAmount(e.target.value)}
+                  placeholder="0,00"
+                  className="h-10 rounded-lg"
+                  required
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button type="button" variant="ghost" onClick={() => setShowPayCardModal(false)} className="rounded-xl">
+                İptal
+              </Button>
+              <Button type="submit" disabled={isPending} className="rounded-xl px-6">
+                {isPending ? 'Ödeniyor...' : 'Ödemeyi Kaydet'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Credit Card PDF Statement Upload Modal */}
+      {showUploadModal && selectedUploadCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => {
+            if (!parsingLoading && !isPending) {
+              setParsedCardTx(null)
+              setUploadFile(null)
+              setShowUploadModal(false)
+            }
+          }} />
+          <div className="relative bg-card border w-full max-w-lg p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <h3 className="font-bold text-lg text-primary flex items-center gap-2">
+                <Upload className="w-5 h-5" />
+                Ekstre Analiz ve Yükleme
+              </h3>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="icon" 
+                disabled={parsingLoading || isPending}
+                onClick={() => {
+                  setParsedCardTx(null)
+                  setUploadFile(null)
+                  setShowUploadModal(false)
+                }} 
+                className="rounded-full h-8 w-8"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Kart: <span className="font-bold text-foreground">{selectedUploadCard.bank_name} - {selectedUploadCard.card_name}</span>
+            </p>
+
+            {!parsedCardTx ? (
+              <form onSubmit={handleUploadCCStatement} className="space-y-4">
+                <div className="space-y-1">
+                  <Label htmlFor="ccFile" className="text-xs font-semibold">Hesap Ekstresi Seçin (PDF)</Label>
+                  <Input 
+                    type="file" 
+                    id="ccFile" 
+                    accept="application/pdf"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    className="h-10 rounded-lg cursor-pointer"
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    onClick={() => setShowUploadModal(false)}
+                    className="rounded-xl"
+                  >
+                    Vazgeç
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={parsingLoading}
+                    className="rounded-xl px-6"
+                  >
+                    {parsingLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        AI Analiz Ediyor...
+                      </>
+                    ) : 'Ekstre Çözümle'}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-emerald-600 font-semibold">
+                  Ekstreden toplam {parsedCardTx.length} adet işlem başarıyla çıkartıldı. Lütfen kontrol edip onaylayın.
+                </p>
+                <div className="max-h-[300px] overflow-y-auto border rounded-xl">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-muted/50 uppercase font-semibold text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-2">Tarih</th>
+                        <th className="px-4 py-2">Açıklama</th>
+                        <th className="px-4 py-2 text-right">Tutar</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {parsedCardTx.map((tx, idx) => {
+                        const isPayment = tx.amount < 0
+                        return (
+                          <tr key={idx} className="hover:bg-muted/35">
+                            <td className="px-4 py-2 whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
+                            <td className="px-4 py-2">{tx.description}</td>
+                            <td className={`px-4 py-2 text-right font-semibold whitespace-nowrap ${
+                              isPayment ? 'text-emerald-600' : 'text-rose-600'
+                            }`}>
+                              {isPayment ? '-' : ''}{formatCurrency(Math.abs(tx.amount))}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    onClick={() => setParsedCardTx(null)}
+                    disabled={isPending}
+                    className="rounded-xl"
+                  >
+                    Geri Dön
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={handleSaveCCStatement}
+                    disabled={isPending}
+                    className="rounded-xl px-6"
+                  >
+                    {isPending ? 'Kaydediliyor...' : 'İşlemleri İçe Aktar'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

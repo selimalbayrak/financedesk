@@ -5,7 +5,7 @@ import { FinanceClient } from '@/features/finance/finance-client'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Finansman (Çek/Senet ve Kredi)',
+  title: 'Finansman (Çek/Senet, Kredi, Kredi Kartı)',
 }
 
 export default async function FinancePage() {
@@ -23,7 +23,9 @@ export default async function FinancePage() {
     { data: installments },
     { data: safes },
     { data: accounts },
-    { data: expenses }
+    { data: expenses },
+    { data: creditCards },
+    { data: cardTransactions }
   ] = await Promise.all([
     supabase
       .from('cheques_notes')
@@ -58,7 +60,18 @@ export default async function FinancePage() {
       .from('factory_expenses')
       .select('*')
       .eq('company_id', companyInfo.id)
-      .order('due_date', { ascending: true })
+      .order('due_date', { ascending: true }),
+    supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('company_id', companyInfo.id)
+      .is('deleted_at', null)
+      .order('card_name'),
+    supabase
+      .from('credit_card_transactions')
+      .select('*, card:credit_cards!inner(*)')
+      .eq('card.company_id', companyInfo.id)
+      .order('transaction_date', { ascending: false })
   ])
 
   return (
@@ -69,6 +82,8 @@ export default async function FinancePage() {
       safes={safes ?? []}
       accounts={accounts ?? []}
       expenses={expenses ?? []}
+      creditCards={creditCards ?? []}
+      cardTransactions={cardTransactions ?? []}
       companyName={companyInfo.name}
     />
   )
