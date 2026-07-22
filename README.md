@@ -1,97 +1,45 @@
-# FinanceDesk
+# FinanceDesk 💼
 
-A lightweight, modern business accounting and financial tracking web application. Built to replace Micro Accounting with a faster, simpler, and more enjoyable experience.
+FinanceDesk, küçük ve orta ölçekli işletmelerin ön muhasebe, cari hesap, kasa/banka nakit akışı, çek/senet, kredi kartı ve personel takibini tek bir panelden kolayca yönetebilmesi için geliştirdiğim modern bir finansal yönetim platformudur.
 
-## Features (Phase 1)
+## 🚀 Öne Çıkan Özellikler
 
-- **Dashboard** — Real-time KPIs: total receivables, payables, loan balances, upcoming payments
-- **Current Accounts (Cari)** — Manage customers and suppliers with full contact/tax info
-- **Payables & Receivables** — Track money owed and owed to you, record payments, track status
+* **Cari Hesap Yönetimi:** Müşteri ve tedarikçilerin borç/alacak bakiyelerini anlık takip etme, detaylı ekstre dökümü ve tek tıkla Mutabakat Mektubu yazdırma.
+* **Yapay Zeka Destekli Ekstre Okuma (AI):** Banka, cari ve kredi kartı ekstrelerini (PDF, Excel, CSV, Resim) Gemini AI altyapısıyla otomatik analiz edip sisteme aktarma.
+* **Çek ve Senet Portföyü:** Alınan/verilen çek ve senetlerin takibi, vadeli kırdırma (erken tahsilat), ciro etme (devretme) ve tahsilat işlemleri.
+* **Kredi Kartları & Ödeme Takvimi:** Şahsi ve şirket kredi kartı borçları, asgari ödeme oranları ve son ödeme günlerini gösteren kronolojik ödeme takvimi.
+* **Kasa & Banka Nakit Akışı:** Nakit, banka ve POS kasalarının yönetimi, kasalar arası transfer ve anlık gelir/gider hareketleri.
+* **Personel & Maaş Takibi:** Çalışan maaş, avans ve mesai takibi, maaş bordrosu çıktısı ve toplu imza föyü alma.
+* **Düzenli & Fabrika Giderleri:** Kira, fatura vb. aylık tekrarlayan giderlerin takvime bağlanıp otomatik hatırlatılması.
 
-## Tech Stack
+## 🛠️ Teknolojiler
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript 5 (strict) |
-| Styling | Tailwind CSS v4 + shadcn/ui v4 |
-| Database | Supabase (PostgreSQL, free tier) |
-| Auth | Supabase Auth |
-| Deployment | Vercel (free tier) |
+* **Frontend & Backend:** Next.js 16 (App Router), TypeScript, React 19
+* **Tasarım:** Tailwind CSS v4, shadcn/ui, Lucide Icons
+* **Veritabanı & Auth:** Supabase (PostgreSQL, Row Level Security)
+* **Yapay Zeka:** Google Gemini 2.0 Flash API
 
-## Quick Start
+## 💻 Yerel Geliştirme (Local Setup)
 
-### 1. Install
-
+1. Projeyi klonlayın ve bağımlılıkları yükleyin:
 ```bash
-cd financedesk
 npm install
 ```
 
-### 2. Set Up Supabase
-
-1. Go to [supabase.com](https://supabase.com) and create a free project
-2. In the SQL Editor, run the migration: `supabase/migration.sql`
-3. Create your first user: Authentication → Users → Add User
-
-### 3. Configure Environment
-
-```bash
-cp .env.local.example .env.local
+2. `.env.local` dosyasını oluşturun ve gerekli değişkenleri tanımlayın:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-Edit `.env.local`:
-```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-Both values are in: Supabase Dashboard → Project Settings → API
-
-### 4. Run Locally
-
+3. Geliştirici sunucusunu başlatın:
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+---
 
-## Deployment (Vercel)
+## 📜 Lisans & Kullanım Hakları
 
-```bash
-git add .
-git commit -m "Initial commit"
-git push
-# Connect repo to Vercel at vercel.com
-# Add environment variables in Vercel Dashboard
-```
-
-## Database Schema
-
-All monetary values are stored as **BIGINT (kuruş = 1/100 TRY)**. The app converts automatically.
-
-| Table | Purpose |
-|---|---|
-| `accounts` | Customers and suppliers (Cari) |
-| `transactions` | Transaction ledger |
-| `payables` | Payable and receivable entries |
-| `payable_payments` | Payment records for payables |
-| `reconciliations` | Supplier reconciliation (Phase 2) |
-| `loans` | Bank loans (Phase 2) |
-| `checks` | Check tracking (Phase 2) |
-| `promissory_notes` | Senet tracking (Phase 2) |
-| `invoices` | Invoice archive (Phase 2) |
-
-## Free Tier Notes
-
-- **Supabase** pauses after 7 days of inactivity — set up a daily health check ping
-- **Vercel** free tier is 100GB bandwidth/month — more than enough for personal use
-- **DB Storage**: 500MB limit (~500K transactions at ~1KB each)
-
-## Roadmap
-
-- [ ] Phase 2: Supplier Reconciliation
-- [ ] Phase 2: Loan Tracking
-- [ ] Phase 2: Check Tracking
-- [ ] Phase 2: Promissory Note Tracking
-- [ ] Phase 2: Invoice Archive + PDF Upload
+Bu yazılımın tüm telif ve mülkiyet hakları **Selim Albayrak**'a aittir. Detaylar için [LICENSE](LICENSE) belgesine göz atabilirsiniz.
