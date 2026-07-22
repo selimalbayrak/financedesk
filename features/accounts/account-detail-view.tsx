@@ -2,17 +2,20 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard, Upload } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard, Upload, MoreVertical, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AccountFormSheet } from './account-form-sheet'
 import { AccountLedger } from './ledger/account-ledger'
 import { AccountTypeBadge } from '@/components/shared/status-badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Account, TransactionWithLines } from '@/types/database.types'
 import { ChequeCashModal } from '../finance/cheque-cash-modal'
+import { deleteChequeNote } from '@/features/finance/actions'
 
 interface AccountDetailViewProps {
   account: Account
@@ -24,6 +27,7 @@ interface AccountDetailViewProps {
 }
 
 export function AccountDetailView({ account, transactions, cheques = [], safes = [], companyId, companyName }: AccountDetailViewProps) {
+  const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [cashModalOpen, setCashModalOpen] = useState(false)
   const [selectedCheque, setSelectedCheque] = useState<any>(null)
@@ -152,54 +156,91 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {cheques.map(cheque => (
-                <Card key={cheque.id} className="shadow-sm flex flex-col justify-between border-border/50">
-                  <div>
-                    <CardHeader className="pb-3 border-b bg-muted/20">
-                      <CardTitle className="text-sm font-semibold flex items-center justify-between">
-                        <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${
-                          cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700' :
-                          cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {cheque.status === 'portfolio' ? 'Portföyde' :
-                           cheque.status === 'cashed' ? 'Tahsil Edildi' : cheque.status}
-                        </span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Tutar:</span>
-                        <span className="font-bold text-lg">{formatCurrency(cheque.amount)}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Muhatap:</span>
-                        <span className="font-medium">{cheque.contact_name}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Vade Tarihi:</span>
-                        <span className="font-medium text-rose-600">{formatDate(cheque.due_date)}</span>
-                      </div>
-                    </CardContent>
-                  </div>
-                  {cheque.status === 'portfolio' && (
-                    <div className="p-4 pt-0 border-t mt-auto flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedCheque(cheque)
-                          setCashModalOpen(true)
-                        }}
-                        className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full text-primary hover:bg-primary/5"
-                      >
-                        {cheque.direction === 'in' ? 'Tahsil Et (Nakit Girişi / Kırdır)' : 'Ödendi İşaretle (Kasadan Düş)'}
-                      </Button>
+              {cheques.map(cheque => {
+                const isKirdirildi = cheque.status === 'cashed' && (cheque.notes || '').includes('Kırdırıldı')
+
+                return (
+                  <Card key={cheque.id} className="shadow-sm flex flex-col justify-between border-border/50">
+                    <div>
+                      <CardHeader className="pb-3 border-b bg-muted/20">
+                        <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                          <span>{cheque.type === 'cheque' ? 'Çek' : 'Senet'} ({cheque.direction === 'in' ? 'Alınan' : 'Verilen'})</span>
+                          
+                          <div className="flex items-center gap-1.5">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              isKirdirildi ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400' :
+                              cheque.status === 'portfolio' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400' :
+                              cheque.status === 'cashed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' :
+                              cheque.status === 'endorsed' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400' :
+                              'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                              {isKirdirildi ? 'Kırdırıldı' :
+                               cheque.status === 'portfolio' ? 'Portföyde' :
+                               cheque.status === 'cashed' ? 'Tahsil Edildi / Ödendi' :
+                               cheque.status === 'endorsed' ? 'Ciro Edildi' : cheque.status}
+                            </span>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger className="h-6 w-6 rounded-full cursor-pointer flex items-center justify-center hover:bg-muted">
+                                <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-card border">
+                                <DropdownMenuItem onClick={async () => {
+                                  if (confirm(`"${formatCurrency(cheque.amount)}" tutarındaki ${cheque.type === 'cheque' ? 'çek' : 'senet'} evrakını silmek istediğinize emin misiniz?`)) {
+                                    const res = await deleteChequeNote(cheque.id)
+                                    if (res.error) toast.error(res.error)
+                                    else {
+                                      toast.success('Evrak silindi.')
+                                      router.refresh()
+                                    }
+                                  }
+                                }} className="cursor-pointer text-rose-600 focus:bg-rose-50">
+                                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                  Sil
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4 space-y-2">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Tutar:</span>
+                          <span className="font-bold text-lg">{formatCurrency(cheque.amount)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Muhatap:</span>
+                          <span className="font-medium">{cheque.contact_name}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">Vade Tarihi:</span>
+                          <span className="font-medium text-rose-600">{formatDate(cheque.due_date)}</span>
+                        </div>
+                        {cheque.notes && (
+                          <p className="text-[11px] text-muted-foreground pt-1 border-t mt-2">
+                            {cheque.notes}
+                          </p>
+                        )}
+                      </CardContent>
                     </div>
-                  )}
-                </Card>
-              ))}
+                    {cheque.status === 'portfolio' && (
+                      <div className="p-4 pt-0 border-t mt-auto flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedCheque(cheque)
+                            setCashModalOpen(true)
+                          }}
+                          className="h-8 text-xs rounded-xl mt-3 cursor-pointer w-full text-primary hover:bg-primary/5"
+                        >
+                          {cheque.direction === 'in' ? 'Tahsil Et (Nakit Girişi / Kırdır)' : 'Ödendi İşaretle (Kasadan Düş)'}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
             </div>
           )}
         </TabsContent>

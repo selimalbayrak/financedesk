@@ -282,11 +282,34 @@ export type AccountBalance = Database['public']['Views']['account_balances']['Ro
 export type SafeBalance = Database['public']['Views']['safe_balances']['Row']
 export type EmployeeBalance = Database['public']['Views']['employee_balances']['Row']
 
-// Extended types with joins
-export type TransactionWithAccount = Transaction & {
-  account: Pick<Account, 'id' | 'name'> | null
+export type Stock = {
+  id: string
+  company_id: string
+  code: string
+  name: string
+  category: string | null
+  unit: string | null
+  unit_price: number
+  quantity_on_hand: number
+  min_stock_level: number
+  description: string | null
+  created_at: string
+  updated_at: string
 }
 
-export type TransactionWithLines = Transaction & {
-  transaction_lines: TransactionLine[]
+export type StockMovement = {
+  id: string
+  company_id: string
+  stock_id: string
+  account_id: string | null
+  transaction_id: string | null
+  movement_type: 'in' | 'out'
+  quantity: number
+  unit_price: number
+  total_amount: number
+  movement_date: string
+  notes: string | null
+  created_at: string
+  stock?: Stock
+  account?: Account
 }

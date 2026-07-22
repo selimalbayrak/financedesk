@@ -29,38 +29,52 @@ export async function POST(req: NextRequest) {
 
     const ccPrompt = `
       Sen uzman bir kredi kartı hesap ekstresi analizörü yapay zekasın. 
-      Sana bir "Kredi Kartı Hesap Ekstresi" (Credit Card Statement) verisi/dosyası veriyorum.
-      Bu verideki tüm kart harcamalarını (alışverişleri) ve ödemeleri analiz et ve aşağıdaki JSON şemasına birebir uyacak şekilde, SADECE geçerli bir JSON array olarak döndür. Başka hiçbir açıklama yazma.
+      Sana bir veya daha fazla "Kredi Kartı Hesap Ekstresi" (Credit Card Statement) dosyası veriyorum.
       
-      ÇOK ÖNEMLİ: Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "amount_raw" alanına yaz. KESİNLİKLE sayıyı dönüştürmeye veya hesaplamaya çalışma!
+      GÖREVİN:
+      1. Ekstreden Kart Toplam Limitini (card_limit) ve Ekstre Dönem Borcunu (statement_debt) tespit edebiliyorsan TL cinsinden yaz (bulamazsan null ver).
+      2. Ekstredaki tüm kart harcamalarını (alışverişleri) ve ödemeleri/iadeleri çıkar.
       
-      Eğer satır bir HARCAMA/ALIŞVERİŞ/ÜYE İŞYERİ HARCAMASI ise tutarı POZİTİF bir değer olarak belirle (örn: "250,50").
-      Eğer satır bir ÖDEME/İADE/ALACAK ise tutarı NEGATİF (önüne eksi koyarak) yap (örn: "-1.500,00" veya "-350").
+      ÖNEMLİ KURALLAR:
+      - Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "amount_raw" alanına yaz.
+      - HARCAMA/ALIŞVERİŞ ise tutarı POZİTİF bir değer yap (örn: "250,50").
+      - ÖDEME/İADE/ALACAK ise tutarı NEGATİF yap (örn: "-1.500,00").
+      - Tarih formatını her zaman YYYY-MM-DD olarak ver.
       
-      Tarih formatını her zaman YYYY-MM-DD olarak ver.
-      İşlem açıklamasını eksiksiz çıkar.
-      
-      Döndürmen gereken JSON yapısı (değerler örnektir):
-      [
-        {
-          "date": "2025-01-01",
-          "description": "MIGROS TURK T.A.S.",
-          "amount_raw": "123,45"
-        },
-        {
-          "date": "2025-01-05",
-          "description": "KART ODEMESI - EFT/HAVALE",
-          "amount_raw": "-2.500,00"
-        }
-      ]
+      Döndürmen gereken JSON formatı:
+      {
+        "card_limit": "150000.00",
+        "statement_debt": "12345.50",
+        "transactions": [
+          {
+            "date": "2025-01-01",
+            "description": "MIGROS TURK T.A.S.",
+            "amount_raw": "123,45"
+          },
+          {
+            "date": "2025-01-05",
+            "description": "KART ODEMESI - EFT/HAVALE",
+            "amount_raw": "-2.500,00"
+          }
+        ]
+      }
     `
 
     let allTransactions: any[] = []
+    let detectedLimit: number | null = null
+    let detectedDebt: number | null = null
 
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       const ext = file.name.split('.').pop()?.toLowerCase() || ''
+
+      let mimeType = 'application/pdf'
+      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
+        mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
+      } else if (ext === 'pdf') {
+        mimeType = 'application/pdf'
+      }
 
       let result
       if (['xlsx', 'xls', 'csv'].includes(ext)) {
@@ -83,14 +97,13 @@ export async function POST(req: NextRequest) {
           {
             inlineData: {
               data: buffer.toString('base64'),
-              mimeType: file.type || 'application/pdf',
+              mimeType,
             },
           },
         ])
       }
 
       const responseText = result.response.text()
-      
       let cleanJson = responseText.trim()
       if (cleanJson.startsWith('```json')) {
         cleanJson = cleanJson.replace(/```json\n?/, '').replace(/\n?```$/, '')
@@ -98,19 +111,26 @@ export async function POST(req: NextRequest) {
         cleanJson = cleanJson.replace(/```\n?/, '').replace(/\n?```$/, '')
       }
 
-      let rawTransactions
+      let parsedData: any
       try {
-        rawTransactions = JSON.parse(cleanJson)
+        parsedData = JSON.parse(cleanJson)
       } catch (err: any) {
-        console.error(`Gemini output for file ${file.name} is not valid JSON. Raw output:`, responseText)
+        console.error(`Gemini output for file ${file.name} is not valid JSON:`, responseText)
         return NextResponse.json({ 
-          error: `${file.name} dosyasının ekstre verileri çözümlenirken geçersiz format oluştu. Lütfen dosyanın net ve okunaklı olduğundan emin olun.`,
+          error: `${file.name} dosyasının ekstre verileri çözümlenirken format hatası oluştu.`,
           details: err.message 
         }, { status: 422 })
       }
 
-      if (!Array.isArray(rawTransactions)) {
-        return NextResponse.json({ error: `${file.name} dosyasından liste formatı alınamadı.` }, { status: 422 })
+      const rawTransactions = Array.isArray(parsedData) 
+        ? parsedData 
+        : (parsedData.transactions || parsedData.data || [])
+
+      if (parsedData.card_limit && !detectedLimit) {
+        detectedLimit = parseFloat(parsedData.card_limit)
+      }
+      if (parsedData.statement_debt && !detectedDebt) {
+        detectedDebt = parseFloat(parsedData.statement_debt)
       }
 
       function parseAmount(raw: string | number | null | undefined): number {
@@ -156,9 +176,9 @@ export async function POST(req: NextRequest) {
       }
 
       const transactions = rawTransactions.map((t: any) => {
-        const amount = parseAmount(t.amount_raw);
+        const amount = parseAmount(t.amount_raw || t.amount);
         return {
-          transaction_date: t.date,
+          transaction_date: t.date || t.transaction_date,
           description: t.description,
           amount
         }
@@ -170,7 +190,11 @@ export async function POST(req: NextRequest) {
     // Sort all transactions by date descending
     allTransactions.sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
 
-    return NextResponse.json({ transactions: allTransactions })
+    return NextResponse.json({ 
+      transactions: allTransactions,
+      extracted_limit: detectedLimit,
+      extracted_debt: detectedDebt
+    })
   } catch (error: any) {
     console.error('PDF CC Parsing Error:', error)
     return NextResponse.json(

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft, Users, CreditCard } from 'lucide-react'
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft, Users, CreditCard, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,6 +44,58 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
   const [safeId, setSafeId] = useState<string>('')
   const [toSafeId, setToSafeId] = useState<string>('')
   const [amount, setAmount] = useState<number>(0)
+
+  // AI Invoice Upload State
+  const [invoiceParsing, setInvoiceParsing] = useState(false)
+
+  const handleInvoiceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return
+    const file = e.target.files[0]
+    setInvoiceParsing(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/parse-statement', {
+        method: 'POST',
+        body: formData
+      })
+      const contentType = res.headers.get('content-type') || ''
+      const text = await res.text()
+
+      if (res.ok && contentType.includes('application/json')) {
+        const data = JSON.parse(text)
+        if (data.transactions && data.transactions.length > 0) {
+          const firstTx = data.transactions[0]
+          if (firstTx.debit > 0 || firstTx.credit > 0) {
+            setAmount((firstTx.debit || firstTx.credit) / 100)
+          }
+          if (firstTx.document_no) {
+            const invoiceInput = document.getElementById('invoice_number') as HTMLInputElement
+            if (invoiceInput) invoiceInput.value = firstTx.document_no
+          }
+          if (firstTx.description) {
+            const descInput = document.getElementById('description') as HTMLInputElement
+            if (descInput) descInput.value = firstTx.description
+          }
+          if (firstTx.date) {
+            const dateInput = document.getElementById('transaction_date') as HTMLInputElement
+            if (dateInput) dateInput.value = firstTx.date
+          }
+          toast.success('Fatura PDF verileri başarıyla okundu ve forma dolduruldu!')
+        } else {
+          toast.info('Belge okundu, lütfen tutarı ve fatura numarasını kontrol edin.')
+        }
+      } else {
+        toast.error('Fatura okunamadı.')
+      }
+    } catch (err: any) {
+      toast.error('Fatura okuma hatası: ' + err.message)
+    } finally {
+      setInvoiceParsing(false)
+    }
+  }
 
   // Integrated Cheque/Senet Entry States
   const [chequeType, setChequeType] = useState<'cheque' | 'promissory_note'>('cheque')
@@ -624,6 +676,24 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
         ) : (
           /* Standard Transaction Form */
           <div className="bg-card p-6 rounded-3xl border shadow-sm space-y-5">
+            {(type === 'invoice_out' || type === 'invoice_in') && (
+              <div className="p-4 bg-primary/5 border border-dashed border-primary/40 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                    <Upload className="w-4 h-4" />
+                    <span>Fatura Belgesi Yükle (PDF / Görsel ile Otomatik Doldur)</span>
+                  </div>
+                  {invoiceParsing && <span className="text-xs text-primary font-medium animate-pulse">AI Analiz Ediyor...</span>}
+                </div>
+                <Input 
+                  type="file" 
+                  accept=".pdf,image/*" 
+                  onChange={handleInvoiceUpload}
+                  disabled={invoiceParsing}
+                  className="text-xs cursor-pointer h-9 rounded-xl bg-background"
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               {type !== 'safe_transfer' && type !== 'salary_payment' && (
                 <div className="space-y-2">

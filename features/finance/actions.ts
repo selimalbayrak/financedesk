@@ -773,7 +773,12 @@ export async function payCreditCardDebt(cardId: string, safeId: string, amount: 
   }
 }
 
-export async function importCreditCardTransactions(cardId: string, transactionsList: Array<{ transaction_date: string; description: string; amount: number }>) {
+export async function importCreditCardTransactions(
+  cardId: string, 
+  transactionsList: Array<{ transaction_date: string; description: string; amount: number }>,
+  extractedLimit?: number | null,
+  extractedDebt?: number | null
+) {
   try {
     const companyInfo = await getActiveCompany()
     if (!companyInfo) return { error: 'Şirket bulunamadı.' }
@@ -791,25 +796,34 @@ export async function importCreditCardTransactions(cardId: string, transactionsL
     const { error: insertErr } = await supabase.from('credit_card_transactions').insert(rows)
     if (insertErr) return { error: `Kart hareketleri eklenemedi: ${insertErr.message}` }
 
-    // 2. Fetch the card details to update current_debt
+    // 2. Fetch the card details to update current_debt & limit
     const { data: card, error: fetchErr } = await supabase
       .from('credit_cards')
-      .select('current_debt')
+      .select('current_debt, card_limit')
       .eq('id', cardId)
       .single()
 
     if (fetchErr || !card) return { error: 'Kredi kartı bulunamadı.' }
 
-    // Sum all transaction amounts
-    const netTransactionDebt = transactionsList.reduce((sum, t) => sum + t.amount, 0)
-    const newDebt = Math.max(0, card.current_debt + netTransactionDebt)
+    let newDebt = card.current_debt
+    if (extractedDebt) {
+      newDebt = Math.round(extractedDebt * 100)
+    } else {
+      const netTransactionDebt = transactionsList.reduce((sum, t) => sum + t.amount, 0)
+      newDebt = Math.max(0, card.current_debt + netTransactionDebt)
+    }
+
+    const updatePayload: any = { current_debt: newDebt }
+    if (extractedLimit) {
+      updatePayload.card_limit = Math.round(extractedLimit * 100)
+    }
 
     const { error: updateErr } = await supabase
       .from('credit_cards')
-      .update({ current_debt: newDebt })
+      .update(updatePayload)
       .eq('id', cardId)
 
-    if (updateErr) return { error: `Kredi kartı borcu güncellenemedi: ${updateErr.message}` }
+    if (updateErr) return { error: `Kredi kartı güncellenemedi: ${updateErr.message}` }
 
     revalidatePath('/finance')
     revalidatePath('/')

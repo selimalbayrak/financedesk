@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useTransition } from 'react'
+import { CreditCardCalendar } from './credit-card-calendar'
 import { PageHeader } from '@/components/shared/page-header'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CreditCard, Landmark, Plus, Printer, Trash2, Building, Check, Loader2, X, Paperclip, FileText, Upload, Calendar, ArrowUpRight, ArrowDownLeft, Pencil, ArrowRightLeft, MoreVertical } from 'lucide-react'
@@ -103,7 +104,14 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
   const [selectedUploadCard, setSelectedUploadCard] = useState<any>(null)
   const [uploadFiles, setUploadFiles] = useState<File[] | null>(null)
   const [parsedCardTx, setParsedCardTx] = useState<any[] | null>(null)
+  const [extractedCardLimit, setExtractedCardLimit] = useState<number | null>(null)
+  const [extractedCardDebt, setExtractedCardDebt] = useState<number | null>(null)
   const [parsingLoading, setParsingLoading] = useState(false)
+
+  // CC Search and Print States
+  const [ccSearchQuery, setCcSearchQuery] = useState('')
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [printSection, setPrintSection] = useState<'all' | 'cheques' | 'loans' | 'cards' | 'expenses'>('all')
 
   // Selected Card Details view
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
@@ -444,6 +452,8 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         toast.error(data.error)
       } else {
         setParsedCardTx(data.transactions || [])
+        setExtractedCardLimit(data.extracted_limit || null)
+        setExtractedCardDebt(data.extracted_debt || null)
         toast.success('Ekstreler başarıyla analiz edildi, önizleme aşağıda listeleniyor.')
       }
     } catch (err: any) {
@@ -457,12 +467,19 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
     if (!parsedCardTx || parsedCardTx.length === 0 || !selectedUploadCard) return
 
     startTransition(async () => {
-      const res = await importCreditCardTransactions(selectedUploadCard.id, parsedCardTx)
+      const res = await importCreditCardTransactions(
+        selectedUploadCard.id, 
+        parsedCardTx, 
+        extractedCardLimit, 
+        extractedCardDebt
+      )
       if (res && 'error' in res && res.error) {
         toast.error(res.error)
       } else {
-        toast.success('Kart hareketleri başarıyla aktarıldı ve kart borcu güncellendi!')
+        toast.success('Kart hareketleri başarıyla aktarıldı ve kart limiti/borcu güncellendi!')
         setParsedCardTx(null)
+        setExtractedCardLimit(null)
+        setExtractedCardDebt(null)
         setUploadFiles(null)
         setShowUploadModal(false)
       }
@@ -548,10 +565,31 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             description="Çek, senet, kredi, kart ve fabrika giderleri takibi"
           />
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-xl h-9">
-              <Printer className="w-4 h-4 mr-2" />
-              Rapor Yazdır
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-xl h-9 cursor-pointer">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Rapor Yazdır
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border w-56">
+                <DropdownMenuItem onClick={() => { setPrintSection('all'); setTimeout(() => window.print(), 100) }} className="cursor-pointer font-medium">
+                  📋 Toplu Finans Raporu (Tümü)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setPrintSection('cheques'); setTimeout(() => window.print(), 100) }} className="cursor-pointer">
+                  📄 1. Çek & Senet Raporu
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setPrintSection('loans'); setTimeout(() => window.print(), 100) }} className="cursor-pointer">
+                  🏦 2. Banka Kredileri Raporu
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setPrintSection('cards'); setTimeout(() => window.print(), 100) }} className="cursor-pointer">
+                  💳 3. Kredi Kartları Raporu
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setPrintSection('expenses'); setTimeout(() => window.print(), 100) }} className="cursor-pointer">
+                  🏭 4. Fabrika Giderleri Raporu
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {activeTab === 'expenses' ? (
               <Button size="sm" onClick={() => setShowExpenseModal(true)} className="rounded-xl h-9 cursor-pointer">
                 <Plus className="w-4 h-4 mr-2" />
@@ -1024,46 +1062,8 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
               </Card>
             </div>
 
-            {/* Kredi Kartları Ödeme Takvimi */}
-            {upcomingCardEvents.length > 0 && (
-              <Card className="border-muted bg-card shadow-sm rounded-3xl p-4 overflow-hidden space-y-3">
-                <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                  <Calendar className="w-4 h-4 text-primary" />
-                  <span>Kredi Kartı Ödeme & Kesim Takvimi</span>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
-                  {upcomingCardEvents.map((evt, idx) => {
-                    const isCutoff = evt.type === 'cutoff'
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`flex-none w-48 p-3 rounded-2xl border flex flex-col justify-between space-y-2 transition-all ${
-                          isCutoff 
-                            ? 'bg-blue-50/50 dark:bg-blue-950/10 border-blue-100 dark:border-blue-900/30' 
-                            : 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-100 dark:border-rose-900/30'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
-                            isCutoff ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/40'
-                          }`}>
-                            {isCutoff ? 'Hesap Kesim' : 'Son Ödeme'}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-mono">{evt.formattedDate}</span>
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs truncate">{evt.cardName}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{evt.bankName}</p>
-                        </div>
-                        <div className="text-[10px] font-semibold text-right text-foreground">
-                          {evt.daysLeft === 0 ? 'Bugün!' : `${evt.daysLeft} Gün Kaldı`}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </Card>
-            )}
+            {/* Kredi Kartları Aylık Takvimi */}
+            <CreditCardCalendar creditCards={creditCards} />
 
             {creditCards.length === 0 ? (
               <Card className="border-dashed bg-muted/10">
