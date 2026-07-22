@@ -34,7 +34,7 @@ export default async function StocksPage() {
       .order('created_at', { ascending: false }),
     supabase
       .from('accounts')
-      .select('id, name, company_name')
+      .select('*')
       .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
       .order('name')

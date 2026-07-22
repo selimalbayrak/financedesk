@@ -566,11 +566,9 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
           />
           <div className="flex gap-2">
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="rounded-xl h-9 cursor-pointer">
-                  <Printer className="w-4 h-4 mr-2" />
-                  Rapor Yazdır
-                </Button>
+              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 cursor-pointer">
+                <Printer className="w-4 h-4 mr-2" />
+                Rapor Yazdır
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card border w-56">
                 <DropdownMenuItem onClick={() => { setPrintSection('all'); setTimeout(() => window.print(), 100) }} className="cursor-pointer font-medium">

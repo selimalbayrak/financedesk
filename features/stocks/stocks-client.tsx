@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Search, Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, Pencil, Trash2, X, RefreshCw } from 'lucide-react'
+import { Plus, Search, Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, Pencil, Trash2, X, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -231,7 +231,7 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
               </div>
 
               {categories.length > 0 && (
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <Select value={selectedCategory} onValueChange={(val) => setSelectedCategory(val!)}>
                   <SelectTrigger className="h-9 w-36 text-xs rounded-xl">
                     <SelectValue placeholder="Kategori" />
                   </SelectTrigger>
@@ -544,7 +544,7 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
 
               <div className="space-y-1">
                 <Label>İlişkili Cari Hesap (Opsiyonel)</Label>
-                <Select value={movementAccountId} onValueChange={setMovementAccountId}>
+                <Select value={movementAccountId} onValueChange={(val) => setMovementAccountId(val!)}>
                   <SelectTrigger className="h-9 rounded-lg">
                     <SelectValue placeholder="Cari hesap seçin..." />
                   </SelectTrigger>

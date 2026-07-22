@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
-import type { TransactionWithLines, Account } from '@/types/database.types'
+import type { TransactionWithLines, Account, TransactionLine } from '@/types/database.types'
 import { ChevronDown, ChevronRight, FileUp, MoreHorizontal, Pencil, Trash2, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -196,7 +196,7 @@ export function AccountLedger({ transactions, accountId, companyId, companyName,
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/50">
-                                  {tx.transaction_lines.map((line) => (
+                                  {tx.transaction_lines.map((line: TransactionLine) => (
                                     <tr key={line.id}>
                                       <td className="py-2">{line.item_code || '—'}</td>
                                       <td className="py-2">{line.description}</td>
