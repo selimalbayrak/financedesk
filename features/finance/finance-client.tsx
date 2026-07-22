@@ -423,9 +423,25 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         body: formData,
       })
 
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        toast.error(data.error || 'Ekstre çözümlenirken hata oluştu.')
+      const contentType = res.headers.get('content-type') || ''
+      const text = await res.text()
+
+      if (!res.ok || !contentType.includes('application/json')) {
+        if (text.includes('<html') || !contentType.includes('application/json')) {
+          if (res.status === 504) toast.error('Zaman aşımı (504): Ekstreler çok büyük veya karmaşık. Lütfen tek seferde daha az sayfa yükleyin.')
+          else if (res.status === 413) toast.error('Yüklenen dosya çok büyük (Limit: 4.5MB).')
+          else toast.error(`Sunucu Hatası (${res.status}): Ekstre analiz edilirken sunucudan yanıt alınamadı.`)
+          return
+        }
+        let jsonErr
+        try { jsonErr = JSON.parse(text) } catch (_) {}
+        toast.error(jsonErr?.error || `Ekstre çözümlenirken hata oluştu (${res.status})`)
+        return
+      }
+
+      const data = JSON.parse(text)
+      if (data.error) {
+        toast.error(data.error)
       } else {
         setParsedCardTx(data.transactions || [])
         toast.success('Ekstreler başarıyla analiz edildi, önizleme aşağıda listeleniyor.')

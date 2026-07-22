@@ -49,6 +49,7 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       await updateTransaction(transaction!.id, data)
       toast.success('İşlem başarıyla güncellendi.')
       onOpenChange(false)
+      router.refresh()
     } catch (error: any) {
       toast.error('Hata: ' + error.message)
     } finally {

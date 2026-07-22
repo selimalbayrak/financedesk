@@ -86,6 +86,7 @@ export async function batchCreateTransactions(transactions: any[]) {
 
   revalidatePath('/')
   revalidatePath('/accounts')
+  revalidatePath('/accounts/[id]', 'page')
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
@@ -102,6 +103,13 @@ export async function updateTransaction(id: string, data: {
 
   const supabase = await createClient()
   
+  const { data: existingTx } = await supabase
+    .from('transactions')
+    .select('account_id')
+    .eq('id', id)
+    .eq('company_id', companyInfo.id)
+    .single()
+
   const { error } = await supabase.from('transactions').update({
     transaction_type: data.transaction_type,
     amount: data.amount,
@@ -115,6 +123,10 @@ export async function updateTransaction(id: string, data: {
 
   revalidatePath('/')
   revalidatePath('/accounts')
+  revalidatePath('/accounts/[id]', 'page')
+  if (existingTx?.account_id) {
+    revalidatePath(`/accounts/${existingTx.account_id}`)
+  }
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
@@ -125,6 +137,13 @@ export async function deleteTransaction(id: string) {
 
   const supabase = await createClient()
   
+  const { data: existingTx } = await supabase
+    .from('transactions')
+    .select('account_id')
+    .eq('id', id)
+    .eq('company_id', companyInfo.id)
+    .single()
+
   const { error } = await supabase.from('transactions').update({
     deleted_at: new Date().toISOString()
   }).eq('id', id).eq('company_id', companyInfo.id)
@@ -133,6 +152,10 @@ export async function deleteTransaction(id: string) {
 
   revalidatePath('/')
   revalidatePath('/accounts')
+  revalidatePath('/accounts/[id]', 'page')
+  if (existingTx?.account_id) {
+    revalidatePath(`/accounts/${existingTx.account_id}`)
+  }
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }
@@ -151,6 +174,8 @@ export async function deleteAllAccountTransactions(accountId: string) {
 
   revalidatePath('/')
   revalidatePath('/accounts')
+  revalidatePath('/accounts/[id]', 'page')
+  revalidatePath(`/accounts/${accountId}`)
   revalidatePath('/transactions')
   revalidatePath('/safes')
 }

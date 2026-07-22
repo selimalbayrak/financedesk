@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +23,7 @@ interface DeleteAllTransactionsDialogProps {
 }
 
 export function DeleteAllTransactionsDialog({ accountId, open, onOpenChange }: DeleteAllTransactionsDialogProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   const handleDelete = async () => {
@@ -30,6 +32,7 @@ export function DeleteAllTransactionsDialog({ accountId, open, onOpenChange }: D
       await deleteAllAccountTransactions(accountId)
       toast.success('Hesaba ait tüm işlemler başarıyla silindi.')
       onOpenChange(false)
+      router.refresh()
     } catch (error: any) {
       toast.error('Hata: ' + error.message)
     } finally {

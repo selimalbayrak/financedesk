@@ -21,8 +21,13 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer)
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    // Using gemini-2.5-flash which supports multimodality (PDF parsing)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
+      }
+    })
 
     const prompt = `
       Sen banka kredi ödeme planlarını (Loan Repayment Plans) analiz eden uzman bir yapay zekasın.

@@ -93,18 +93,25 @@ export function ImportForm({ accounts, safes }: Props) {
         body: formData
       })
 
-      if (!res.ok) {
-        const text = await res.text()
-        let errorMessage = text
-        if (text.includes('<html')) {
+      const contentType = res.headers.get('content-type') || ''
+      const text = await res.text()
+
+      if (!res.ok || !contentType.includes('application/json')) {
+        let errorMessage = 'Sunucuda beklenmeyen bir hata oluştu.'
+        if (text.includes('<html') || !contentType.includes('application/json')) {
           if (res.status === 413) errorMessage = "Yüklenen PDF dosyası çok büyük (Limit: 4.5MB)."
-          else if (res.status === 504) errorMessage = "İşlem zaman aşımına uğradı. Lütfen daha küçük bir PDF deneyin."
-          else errorMessage = "Sunucuda beklenmeyen bir hata oluştu."
+          else if (res.status === 504) errorMessage = "İşlem zaman aşımına uğradı (504). Lütfen daha küçük veya az sayfalı bir belge deneyin."
+          else errorMessage = `Sunucu Hatası (${res.status}): Lütfen tekrar deneyin.`
+        } else {
+          try {
+            const errObj = JSON.parse(text)
+            errorMessage = errObj.error || text
+          } catch (_) {}
         }
-        throw new Error(`API Hatası (${res.status}): ${errorMessage.slice(0, 100)}`)
+        throw new Error(errorMessage)
       }
 
-      const data = await res.json()
+      const data = JSON.parse(text)
       if (data.error) {
         alert('Hata: ' + data.error)
       } else if (data.transactions) {

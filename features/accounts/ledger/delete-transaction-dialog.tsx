@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +25,7 @@ interface DeleteTransactionDialogProps {
 }
 
 export function DeleteTransactionDialog({ transaction, open, onOpenChange }: DeleteTransactionDialogProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
 
   if (!transaction) return null
@@ -34,6 +36,7 @@ export function DeleteTransactionDialog({ transaction, open, onOpenChange }: Del
       await deleteTransaction(transaction.id)
       toast.success('İşlem başarıyla silindi.')
       onOpenChange(false)
+      router.refresh()
     } catch (error: any) {
       toast.error('Hata: ' + error.message)
     } finally {

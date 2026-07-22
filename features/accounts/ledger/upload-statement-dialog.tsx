@@ -46,16 +46,23 @@ export function UploadStatementDialog({ open, onOpenChange, accountId }: UploadS
         body: formData,
       })
 
+      const contentType = res.headers.get('content-type') || ''
       const text = await res.text()
-      let data
-      try {
-        data = JSON.parse(text)
-      } catch (e) {
-        throw new Error(`Sunucu Hatası: ${text.substring(0, 100)}`)
+
+      if (!res.ok || !contentType.includes('application/json')) {
+        if (text.includes('<html') || !contentType.includes('application/json')) {
+          if (res.status === 504) throw new Error('Zaman aşımı (504): Belge çok uzun veya karmaşık. Lütfen daha az sayfalı bir PDF veya Excel dosyası deneyin.')
+          if (res.status === 413) throw new Error('Yüklenen dosya çok büyük (Limit: 4.5MB).')
+          throw new Error(`Sunucu Hatası (${res.status}): Ekstre okunurken sunucudan geçersiz yanıt alındı.`)
+        }
+        let jsonErr
+        try { jsonErr = JSON.parse(text) } catch (_) {}
+        throw new Error(jsonErr?.error || `İşleme hatası (${res.status})`)
       }
 
-      if (!res.ok) {
-        throw new Error(`${data.error || 'İşleme hatası'}: ${data.details || ''}`)
+      const data = JSON.parse(text)
+      if (data.error) {
+        throw new Error(data.error)
       }
 
       setParsedData(data.transactions)
