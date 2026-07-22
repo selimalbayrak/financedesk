@@ -118,7 +118,7 @@ export function ImportForm({ accounts, safes }: Props) {
         setParsedData(data.transactions)
       }
     } catch (err: any) {
-      alert('Beklenmeyen bir hata oluştu: ' + err.message)
+      alert('Beklenmeyen bir hata oluştu:\n' + err.message)
     } finally {
       setIsUploading(false)
     }
@@ -217,6 +217,7 @@ export function ImportForm({ accounts, safes }: Props) {
 
     startTransition(async () => {
       try {
+
         await batchCreateTransactions(preparedTransactions)
         router.push('/transactions')
       } catch (e: any) {

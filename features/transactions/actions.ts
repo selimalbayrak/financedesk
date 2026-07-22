@@ -144,6 +144,7 @@ export async function deleteTransaction(id: string) {
     .eq('company_id', companyInfo.id)
     .single()
 
+  await supabase.from('transaction_lines').delete().eq('transaction_id', id)
   const { error } = await supabase.from('transactions').delete().eq('id', id).eq('company_id', companyInfo.id)
 
   if (error) throw new Error(error.message)
@@ -164,9 +165,24 @@ export async function deleteAllAccountTransactions(accountId: string) {
 
   const supabase = await createClient()
   
-  const { error } = await supabase.from('transactions').delete().eq('account_id', accountId).eq('company_id', companyInfo.id)
-
-  if (error) throw new Error(error.message)
+  const { data: txs } = await supabase.from('transactions').select('id').eq('account_id', accountId).eq('company_id', companyInfo.id)
+  
+  if (txs && txs.length > 0) {
+    const txIds = txs.map(t => t.id)
+    
+    // Chunk size for bulk operations to prevent 414 URI Too Long
+    const chunkSize = 50
+    for (let i = 0; i < txIds.length; i += chunkSize) {
+      const chunk = txIds.slice(i, i + chunkSize)
+      
+      // Delete lines first due to RLS cascade issue
+      await supabase.from('transaction_lines').delete().in('transaction_id', chunk)
+      
+      // Delete transactions chunk
+      const { error } = await supabase.from('transactions').delete().in('id', chunk).eq('company_id', companyInfo.id)
+      if (error) throw new Error(error.message)
+    }
+  }
 
   revalidatePath('/')
   revalidatePath('/accounts')
@@ -210,4 +226,90 @@ export async function createEmployeeTransaction(data: {
   revalidatePath('/employees')
   revalidatePath(`/employees/${data.employee_id}`)
   revalidatePath('/safes')
+}
+
+export async function createStockReceipt(data: {
+  account_id?: string
+  safe_id?: string
+  stock_id: string
+  movement_type: 'in' | 'out'
+  quantity: number
+  unit_price: number
+  description?: string
+  transaction_date: string
+  invoice_number?: string
+  payment_method?: string
+}) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Company not found' }
+
+  const supabase = await createClient()
+
+  // 1. Fetch stock
+  const { data: stock, error: fetchErr } = await supabase
+    .from('stocks')
+    .select('*')
+    .eq('id', data.stock_id)
+    .eq('company_id', companyInfo.id)
+    .single()
+
+  if (fetchErr || !stock) return { error: 'Stok ürünü bulunamadı.' }
+
+  const total_amount = Math.round(data.quantity * data.unit_price)
+
+  // 2. Create Transaction
+  const { data: tx, error: txError } = await supabase
+    .from('transactions')
+    .insert({
+      company_id: companyInfo.id,
+      account_id: data.account_id || null,
+      safe_id: data.safe_id || null,
+      transaction_type: data.movement_type === 'in' ? 'payment_out' : 'payment_in',
+      amount: total_amount,
+      description: data.description || (data.movement_type === 'in' ? 'Stok Girişi (Alış)' : 'Stok Çıkışı (Satış)'),
+      transaction_date: data.transaction_date,
+      invoice_number: data.invoice_number,
+      payment_method: data.payment_method
+    } as any)
+    .select()
+    .single()
+
+  if (txError) return { error: txError.message }
+
+  // 3. Create Stock Movement
+  const { error: moveErr } = await supabase.from('stock_movements').insert({
+    company_id: companyInfo.id,
+    stock_id: data.stock_id,
+    account_id: data.account_id || null,
+    transaction_id: tx.id,
+    movement_type: data.movement_type,
+    quantity: data.quantity,
+    unit_price: data.unit_price,
+    total_amount,
+    notes: data.description || (data.movement_type === 'in' ? 'Stok Girişi (Alış)' : 'Stok Çıkışı (Satış)')
+  } as any)
+
+  if (moveErr) {
+    await supabase.from('transactions').delete().eq('id', tx.id)
+    return { error: moveErr.message }
+  }
+
+  // 4. Update Stock Quantity
+  const newQty = data.movement_type === 'in'
+    ? Number(stock.quantity_on_hand || 0) + Number(data.quantity)
+    : Number(stock.quantity_on_hand || 0) - Number(data.quantity)
+
+  await supabase
+    .from('stocks')
+    .update({
+      quantity_on_hand: newQty,
+      unit_price: data.unit_price,
+      updated_at: new Date().toISOString()
+    } as any)
+    .eq('id', data.stock_id)
+
+  revalidatePath('/transactions')
+  revalidatePath('/stocks')
+  revalidatePath('/')
+  return { success: true }
 }

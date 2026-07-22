@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft, Users, CreditCard, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, PackagePlus, PackageMinus, ArrowRightLeft, Users, CreditCard, Upload, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MoneyInput } from '@/components/ui/money-input'
-import { createTransaction, createEmployeeTransaction } from './actions'
+import { createTransaction, createEmployeeTransaction, createStockReceipt } from './actions'
 import { createChequeNote } from '@/features/finance/actions'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
@@ -28,13 +28,14 @@ const TRANSACTION_TYPES = [
   { id: 'safe_transfer', label: 'Kasalar Arası Transfer', icon: ArrowRightLeft, color: 'text-blue-500' },
   { id: 'salary_payment', label: 'Maaş/Avans Ödemesi', icon: Users, color: 'text-amber-500' },
   { id: 'cheque_note', label: 'Çek / Senet', icon: CreditCard, color: 'text-indigo-500' },
+  { id: 'stock_receipt', label: 'Stok Fişi (Alış/Satış)', icon: Package, color: 'text-fuchsia-500' },
 ] as const
 
 const PAYMENT_METHODS = [
   'Nakit', 'Havale/EFT', 'Kredi Kartı', 'Çek', 'Senet'
 ]
 
-export function TransactionForm({ accounts, safes, employees = [] }: { accounts: Account[], safes: Array<{id: string, name: string}>, employees?: Array<{id: string, name: string}> }) {
+export function TransactionForm({ accounts, safes, employees = [], stocks = [] }: { accounts: Account[], safes: Array<{id: string, name: string}>, employees?: Array<{id: string, name: string}>, stocks?: Array<{id: string, name: string, code: string, unit: string}> }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [type, setType] = useState<typeof TRANSACTION_TYPES[number]['id']>('payment_out')
@@ -44,6 +45,9 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
   const [safeId, setSafeId] = useState<string>('')
   const [toSafeId, setToSafeId] = useState<string>('')
   const [amount, setAmount] = useState<number>(0)
+  const [stockId, setStockId] = useState<string>('')
+  const [stockQuantity, setStockQuantity] = useState<string>('1')
+  const [stockMovementType, setStockMovementType] = useState<'in' | 'out'>('in')
 
   // AI Invoice Upload State
   const [invoiceParsing, setInvoiceParsing] = useState(false)
@@ -251,6 +255,24 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
         })
         toast.success('İşlem başarıyla eklendi!')
         router.push('/')
+      } else if (type === 'stock_receipt') {
+        const amountStr = formData.get('amount') as string
+        const txVal = Math.round(parseFloat(amountStr.replace(',', '.')) * 100)
+        
+        await createStockReceipt({
+          stock_id: stockId,
+          account_id: accountId || undefined,
+          safe_id: safeId || undefined,
+          movement_type: stockMovementType,
+          quantity: parseFloat(stockQuantity) || 1,
+          unit_price: txVal,
+          description: formData.get('description') as string,
+          transaction_date: formData.get('transaction_date') as string,
+          invoice_number: formData.get('invoice_number') as string,
+          payment_method: paymentMethod,
+        })
+        toast.success('Stok fişi başarıyla eklendi!')
+        router.push('/stocks')
       } else {
         const amountStr = formData.get('amount') as string
         const txVal = Math.round(parseFloat(amountStr.replace(',', '.')) * 100)
@@ -698,11 +720,12 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
               {type !== 'safe_transfer' && type !== 'salary_payment' && (
                 <div className="space-y-2">
                   <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
-                  <Select name="account_id" required value={accountId} onValueChange={(val) => setAccountId(val || '')}>
+                  <Select name="account_id" required={type !== 'stock_receipt'} value={accountId} onValueChange={(val) => setAccountId(val || '')}>
                     <SelectTrigger className="h-12 rounded-xl">
                       <SelectValue>{selectedAccountName}</SelectValue>
                     </SelectTrigger>
                     <SelectContent className="bg-card border">
+                      <SelectItem value="none" className="text-muted-foreground">Boş bırak / Seçimsiz</SelectItem>
                       {accounts.map(acc => (
                         <SelectItem key={acc.id} value={acc.id}>
                           {acc.company_name || acc.name} {acc.company_name ? `(${acc.name})` : ''}
@@ -735,6 +758,56 @@ export function TransactionForm({ accounts, safes, employees = [] }: { accounts:
                     </SelectContent>
                   </Select>
                 </div>
+              )}
+
+              {type === 'stock_receipt' && (
+                <>
+                  <div className="col-span-2 p-4 bg-primary/5 border border-dashed border-primary/40 rounded-2xl space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Stok Kalemi Seçin</Label>
+                        <Select required value={stockId} onValueChange={(val) => setStockId(val || '')}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background">
+                            <SelectValue placeholder="Stok seçin..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {stocks.map(st => (
+                              <SelectItem key={st.id} value={st.id}>
+                                {st.code} - {st.name}
+                              </SelectItem>
+                            ))}
+                            {stocks.length === 0 && <SelectItem value="none" disabled>Stok bulunamadı</SelectItem>}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>İşlem Türü</Label>
+                        <Select required value={stockMovementType} onValueChange={(val) => setStockMovementType((val as 'in'|'out') || 'in')}>
+                          <SelectTrigger className="h-12 rounded-xl bg-background">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="in">Giriş (Alış/İade) - Para Çıkar</SelectItem>
+                            <SelectItem value="out">Çıkış (Satış/Fire) - Para Girer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Miktar</Label>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          required 
+                          value={stockQuantity} 
+                          onChange={e => setStockQuantity(e.target.value)} 
+                          className="h-12 rounded-xl bg-background"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
               
               <div className="space-y-2">

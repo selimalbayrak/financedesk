@@ -1,39 +1,34 @@
 # FinanceDesk 💼
 
-FinanceDesk, küçük ve orta ölçekli işletmelerin ön muhasebe, cari hesap, kasa/banka nakit akışı, çek/senet, kredi kartı ve personel takibini tek bir panelden kolayca yönetebilmesi için geliştirdiğim modern bir finansal yönetim platformudur.
+Selamlar,
 
-## 🚀 Öne Çıkan Özellikler
+FinanceDesk, küçük ve orta ölçekli işletmelerin günlük finans, ön muhasebe, cari hesap, kredi kartı ve nakit akışı takibini yapabilmesi için geliştirdiğim bir platform. Eskiden her şeyi Excel'de tutmaktan sıkıldığım için böyle bir çözüm geliştirdim.
 
-* **Cari Hesap Yönetimi:** Müşteri ve tedarikçilerin borç/alacak bakiyelerini anlık takip etme, detaylı ekstre dökümü ve tek tıkla Mutabakat Mektubu yazdırma.
-* **Yapay Zeka Destekli Ekstre Okuma (AI):** Banka, cari ve kredi kartı ekstrelerini (PDF, Excel, CSV, Resim) Gemini AI altyapısıyla otomatik analiz edip sisteme aktarma.
-* **Çek ve Senet Portföyü:** Alınan/verilen çek ve senetlerin takibi, vadeli kırdırma (erken tahsilat), ciro etme (devretme) ve tahsilat işlemleri.
-* **Kredi Kartları & Ödeme Takvimi:** Şahsi ve şirket kredi kartı borçları, asgari ödeme oranları ve son ödeme günlerini gösteren kronolojik ödeme takvimi.
-* **Kasa & Banka Nakit Akışı:** Nakit, banka ve POS kasalarının yönetimi, kasalar arası transfer ve anlık gelir/gider hareketleri.
-* **Personel & Maaş Takibi:** Çalışan maaş, avans ve mesai takibi, maaş bordrosu çıktısı ve toplu imza föyü alma.
-* **Düzenli & Fabrika Giderleri:** Kira, fatura vb. aylık tekrarlayan giderlerin takvime bağlanıp otomatik hatırlatılması.
+## 🚀 Özellikler
 
-## 🛠️ Teknolojiler
+* **Cari Yönetimi:** Müşteri/tedarikçi borç alacak takibi, tek tıkla mutabakat.
+* **Akıllı Ekstre Okuma:** PDF, Excel, resim veya CSV formatındaki banka ve kart ekstrelerini sisteme atıyorsunuz, kendi kendine okuyup içeri aktarıyor.
+* **Çek ve Senetler:** Portföydeki çekleri/senetleri takip etme, kırdırma ve ciro etme işlemleri. Kırdırınca masrafı otomatik düşüyor.
+* **Kredi Kartı Takvimi:** Tüm kartların kesim ve son ödeme tarihlerini aylık takvim üzerinden takip edebilirsiniz.
+* **Personel Takibi:** Maaş ve avans işlemleri.
 
-* **Frontend & Backend:** Next.js 16 (App Router), TypeScript, React 19
-* **Tasarım:** Tailwind CSS v4, shadcn/ui, Lucide Icons
-* **Veritabanı & Auth:** Supabase (PostgreSQL, Row Level Security)
-* **Yapay Zeka:** Google Gemini 2.0 Flash API
+## 🛠️ Nasıl Çalıştırılır?
 
-## 💻 Yerel Geliştirme (Local Setup)
+Projeyi Next.js 16 (App Router) ile geliştirdim. Veritabanı olarak Supabase kullanıyorum.
 
-1. Projeyi klonlayın ve bağımlılıkları yükleyin:
+1. Bağımlılıkları yükleyin:
 ```bash
 npm install
 ```
 
-2. `.env.local` dosyasını oluşturun ve gerekli değişkenleri tanımlayın:
+2. `.env.local` dosyası oluşturup bilgileri girin:
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-GEMINI_API_KEY=your_gemini_api_key
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+GEMINI_API_KEY=...
 ```
 
-3. Geliştirici sunucusunu başlatın:
+3. Uygulamayı ayağa kaldırın:
 ```bash
 npm run dev
 ```
@@ -42,4 +37,4 @@ npm run dev
 
 ## 📜 Lisans & Kullanım Hakları
 
-Bu yazılımın tüm telif ve mülkiyet hakları **Selim Albayrak**'a aittir. Detaylar için [LICENSE](LICENSE) belgesine göz atabilirsiniz.
+Bu projenin tüm hakları bana (Selim Albayrak) aittir. İzinsiz kopyalanamaz ve paylaşılamaz. Kendi kullanımınız veya test için [LICENSE](LICENSE) dosyasına göz atabilirsiniz.

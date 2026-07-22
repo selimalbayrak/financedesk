@@ -32,8 +32,14 @@ export async function createChequeNote(data: {
 
     const supabase = await createClient()
     
-    // Status is always 'portfolio' because discounted cheques also remain active until maturity
-    const status = 'portfolio'
+    // If discounted (kırdırma), it is essentially cashed/endorsed to the bank immediately
+    const status = data.apply_discount ? 'cashed' : 'portfolio'
+    
+    // Append Kırdırıldı info to notes if discounted
+    let finalNotes = data.notes || ''
+    if (data.apply_discount) {
+      finalNotes = finalNotes ? `${finalNotes} (Kırdırıldı)` : 'Kırdırıldı'
+    }
 
     const { data: cheque, error } = await supabase.from('cheques_notes').insert({
       company_id: companyInfo.id,
@@ -47,7 +53,7 @@ export async function createChequeNote(data: {
       account_id: data.account_id || null,
       bank_name: data.bank_name || null,
       document_number: data.document_number || null,
-      notes: data.notes || null,
+      notes: finalNotes || null,
     }).select().single()
 
     if (error) return { error: error.message }

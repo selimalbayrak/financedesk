@@ -55,14 +55,14 @@ export function CreditCardCalendar({ creditCards }: CreditCardCalendarProps) {
       if (Number(card.cutoff_day) === dayNum) {
         events.push({
           type: 'cutoff',
-          cardName: card.name,
+          cardName: card.card_name,
           bankName: card.bank_name || ''
         })
       }
       if (Number(card.due_day) === dayNum) {
         events.push({
           type: 'due',
-          cardName: card.name,
+          cardName: card.card_name,
           bankName: card.bank_name || '',
           amount: card.current_debt
         })
