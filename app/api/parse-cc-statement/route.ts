@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
           {
             inlineData: {
               data: buffer.toString('base64'),
-              mimeType,
+              mimeType: ext === 'pdf' ? 'application/pdf' : (file.type || 'application/pdf'),
             },
           },
         ])
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('PDF CC Parsing Error:', error)
     return NextResponse.json(
-      { error: 'Dosya işlenirken bir hata oluştu', details: error.message },
+      { error: `Yapay Zeka veya Sistem Hatası: ${error.message || 'Bilinmeyen hata'}` },
       { status: 500 }
     )
   }
