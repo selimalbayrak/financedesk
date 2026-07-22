@@ -144,9 +144,7 @@ export async function deleteTransaction(id: string) {
     .eq('company_id', companyInfo.id)
     .single()
 
-  const { error } = await supabase.from('transactions').update({
-    deleted_at: new Date().toISOString()
-  }).eq('id', id).eq('company_id', companyInfo.id)
+  const { error } = await supabase.from('transactions').delete().eq('id', id).eq('company_id', companyInfo.id)
 
   if (error) throw new Error(error.message)
 
@@ -166,9 +164,7 @@ export async function deleteAllAccountTransactions(accountId: string) {
 
   const supabase = await createClient()
   
-  const { error } = await supabase.from('transactions').update({
-    deleted_at: new Date().toISOString()
-  }).eq('account_id', accountId).eq('company_id', companyInfo.id).is('deleted_at', null)
+  const { error } = await supabase.from('transactions').delete().eq('account_id', accountId).eq('company_id', companyInfo.id)
 
   if (error) throw new Error(error.message)
 

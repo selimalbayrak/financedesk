@@ -1176,46 +1176,73 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                       {/* Collapsible card ledger details */}
                       {isExpanded && (
                         <div className="border-t bg-muted/10 p-4 space-y-3 animate-in-up">
-                          <p className="font-bold text-xs uppercase text-primary tracking-wide">Aylık Kart Hareketleri Ledger</p>
+                          <div className="flex items-center justify-between">
+                            <p className="font-bold text-xs uppercase text-primary tracking-wide">Aylık Kart Hareketleri Ledger</p>
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                placeholder="İşlem ara..."
+                                className="h-8 pl-8 text-xs w-64 rounded-xl"
+                                value={ccSearchQuery}
+                                onChange={(e) => setCcSearchQuery(e.target.value)}
+                              />
+                            </div>
+                          </div>
                           {cardTx.length === 0 ? (
                             <p className="text-xs text-muted-foreground py-4 text-center">Bu karta ait henüz bir hareket kaydı bulunmuyor. PDF Hesap ekstresi yükleyebilirsiniz.</p>
                           ) : (
-                            <div className="overflow-x-auto rounded-xl border bg-card">
-                              <table className="w-full text-xs text-left">
-                                <thead className="bg-muted/40 uppercase font-semibold text-muted-foreground">
-                                  <tr>
-                                    <th className="px-4 py-2">Tarih</th>
-                                    <th className="px-4 py-2">Açıklama</th>
-                                    <th className="px-4 py-2 text-right">Tutar</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                  {cardTx.map(tx => {
-                                    const isPayment = tx.amount < 0
-                                    return (
-                                      <tr key={tx.id} className="hover:bg-muted/30">
-                                        <td className="px-4 py-2 font-medium whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
-                                        <td className="px-4 py-2">{tx.description}</td>
-                                        <td className={`px-4 py-2 text-right font-semibold whitespace-nowrap flex items-center justify-end gap-1.5 ${
-                                          isPayment ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                                        }`}>
-                                          {isPayment ? (
-                                            <>
-                                              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
-                                              -{formatCurrency(Math.abs(tx.amount))} (Ödeme/İade)
-                                            </>
-                                          ) : (
-                                            <>
-                                              <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
-                                              {formatCurrency(tx.amount)} (Harcama)
-                                            </>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
+                            <div className="space-y-4">
+                              {Object.entries(
+                                cardTx
+                                  .filter(tx => (tx.description || '').toLowerCase().includes(ccSearchQuery.toLowerCase()))
+                                  .reduce((acc, tx) => {
+                                    const month = new Date(tx.transaction_date).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })
+                                    if (!acc[month]) acc[month] = []
+                                    acc[month].push(tx)
+                                    return acc
+                                  }, {} as Record<string, typeof cardTx>)
+                              ).map(([month, txs]) => (
+                                <div key={month} className="space-y-2">
+                                  <h4 className="text-sm font-semibold text-muted-foreground bg-muted/20 px-3 py-1.5 rounded-md inline-block">{month}</h4>
+                                  <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+                                    <table className="w-full text-xs text-left">
+                                      <thead className="bg-muted/40 uppercase font-semibold text-muted-foreground">
+                                        <tr>
+                                          <th className="px-4 py-2">Tarih</th>
+                                          <th className="px-4 py-2">Açıklama</th>
+                                          <th className="px-4 py-2 text-right">Tutar</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y">
+                                        {txs.map(tx => {
+                                          const isPayment = tx.amount < 0
+                                          return (
+                                            <tr key={tx.id} className="hover:bg-muted/30">
+                                              <td className="px-4 py-2 font-medium whitespace-nowrap">{formatDate(tx.transaction_date)}</td>
+                                              <td className="px-4 py-2">{tx.description}</td>
+                                              <td className={`px-4 py-2 text-right font-semibold whitespace-nowrap flex items-center justify-end gap-1.5 ${
+                                                isPayment ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                              }`}>
+                                                {isPayment ? (
+                                                  <>
+                                                    <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
+                                                    -{formatCurrency(Math.abs(tx.amount))} (Ödeme/İade)
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
+                                                    {formatCurrency(tx.amount)} (Harcama)
+                                                  </>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          )
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -1238,7 +1265,8 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
         </div>
 
         {/* Cheques section in Print */}
-        <div className="space-y-3">
+        {(printSection === 'all' || printSection === 'cheques') && (
+          <div className="space-y-3">
           <h3 className="text-sm font-bold border-b pb-1 uppercase">1. Portföydeki Çek ve Senetler</h3>
           <table className="w-full text-xs border-collapse border border-gray-400">
             <thead>
@@ -1269,9 +1297,11 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Bank Loans section in Print */}
-        <div className="space-y-3">
+        {(printSection === 'all' || printSection === 'loans') && (
+          <div className="space-y-3">
           <h3 className="text-sm font-bold border-b pb-1 uppercase">2. Banka Kredileri Durumu</h3>
           <table className="w-full text-xs border-collapse border border-gray-400">
             <thead>
@@ -1306,9 +1336,11 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Factory Expenses section in Print */}
-        <div className="space-y-3">
+        {(printSection === 'all' || printSection === 'expenses') && (
+          <div className="space-y-3">
           <h3 className="text-sm font-bold border-b pb-1 uppercase">3. Fabrika Giderleri Durumu</h3>
           <table className="w-full text-xs border-collapse border border-gray-400">
             <thead>
@@ -1359,9 +1391,11 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             </tbody>
           </table>
         </div>
+        )}
 
         {/* Credit Cards section in Print */}
-        <div className="space-y-3">
+        {(printSection === 'all' || printSection === 'cards') && (
+          <div className="space-y-3">
           <h3 className="text-sm font-bold border-b pb-1 uppercase">4. Kredi Kartları Durumu</h3>
           <table className="w-full text-xs border-collapse border border-gray-400">
             <thead>
@@ -1392,6 +1426,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* New Factory Expense Dialog */}
