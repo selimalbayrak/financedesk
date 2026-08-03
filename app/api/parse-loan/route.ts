@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { loanStatementSchema } from '@/lib/schemas'
+import { extractDocumentText } from '@/lib/document/extract-text'
+import { extractStructuredData } from '@/lib/ai/gemini'
+import { getFileHash, getCachedResult, setCachedResult } from '@/lib/cache'
 
 export const maxDuration = 60
 
@@ -19,20 +22,29 @@ export async function POST(req: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+    
+    // Hash check
+    const hash = getFileHash(buffer)
+    const cached = getCachedResult(hash)
+    if (cached) {
+      console.log('Returning cached loan result for', hash)
+      return NextResponse.json({ loan: cached })
+    }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const extracted = await extractDocumentText(buffer, ext)
+    
+    if (extracted.error) {
+      if (extracted.requiresOCR) {
+        return NextResponse.json({ requiresOCR: true, error: extracted.error }, { status: 422 })
       }
-    })
+      return NextResponse.json({ error: extracted.error }, { status: 422 })
+    }
 
     const prompt = `
       Sen banka kredi ödeme planlarını (Loan Repayment Plans) analiz eden uzman bir yapay zekasın.
-      Sana bir kredi ödeme planı belgesi (PDF veya Görsel) veriyorum.
-      Lütfen bu belgeden aşağıdaki bilgileri çıkar ve SADECE geçerli bir JSON objesi döndür. Başka hiçbir açıklama veya markdown bloğu yazma.
+      Sana bir kredi ödeme planı belgesinin metnini veriyorum.
+      Lütfen bu metinden aşağıdaki bilgileri çıkar ve SADECE geçerli bir JSON objesi döndür. Başka hiçbir açıklama yazma.
 
       Çıkarman gereken bilgiler:
       1. bank_name: Krediyi veren bankanın adı (Örn: "QNB Finansbank", "Akbank", "Garanti BBVA" vs. Metin olarak)
@@ -45,44 +57,21 @@ export async function POST(req: NextRequest) {
       8. installments: Tüm taksit planı satırlarını listeleyen bir array. Her satır şu alanları içermelidir:
          - due_date: Taksit vade tarihi (YYYY-MM-DD formatında)
          - amount_due: Ödenecek taksit tutarı (Float olarak)
-
-      Örnek Dönüş Formatı:
-      {
-        "bank_name": "QNB Finansbank",
-        "loan_amount": 5000000.00,
-        "total_repayment": 7251959.64,
-        "interest_rate": 3.06,
-        "start_date": "2026-02-17",
-        "end_date": "2028-02-17",
-        "monthly_installment": 302164.98,
-        "installments": [
-          { "due_date": "2026-03-17", "amount_due": 302164.98 },
-          { "due_date": "2026-04-17", "amount_due": 302164.98 }
-        ]
-      }
     `
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: buffer.toString('base64'),
-          mimeType: file.type || 'application/pdf',
-        },
-      },
-    ])
-
-    const responseText = result.response.text()
+    const parsedData = await extractStructuredData(extracted.text, prompt, apiKey)
     
-    // Clean up markdown code blocks if present
-    let cleanJson = responseText.trim()
-    if (cleanJson.startsWith('\`\`\`json')) {
-      cleanJson = cleanJson.replace(/\`\`\`json\n?/, '').replace(/\n?\`\`\`$/, '')
-    } else if (cleanJson.startsWith('\`\`\`')) {
-      cleanJson = cleanJson.replace(/\`\`\`\n?/, '').replace(/\n?\`\`\`$/, '')
+    // Validate
+    const validationResult = loanStatementSchema.safeParse(parsedData)
+    if (!validationResult.success) {
+      console.error('Zod validation failed for loan:', validationResult.error)
+      return NextResponse.json({ 
+        error: 'Kredi belgesi çözümlenirken format hatası oluştu.',
+        details: validationResult.error.issues
+      }, { status: 422 })
     }
 
-    const loanData = JSON.parse(cleanJson)
+    const loanData = validationResult.data
 
     // Helper to format/parse dates
     function normalizeDate(rawDateStr: string): string {
@@ -108,11 +97,16 @@ export async function POST(req: NextRequest) {
       }))
     }
 
+    setCachedResult(hash, loanData)
+
     return NextResponse.json({ loan: loanData })
   } catch (error: any) {
     console.error('PDF parsing error:', error)
+    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+      return NextResponse.json({ error: 'Yapay zeka kullanım limiti aşıldı. Lütfen 1 dakika bekleyip tekrar deneyin.' }, { status: 429 })
+    }
     return NextResponse.json(
-      { error: 'PDF işlenirken bir hata oluştu', details: error.message },
+      { error: `Yapay Zeka veya Sistem Hatası: ${error.message || 'Bilinmeyen hata'}` },
       { status: 500 }
     )
   }

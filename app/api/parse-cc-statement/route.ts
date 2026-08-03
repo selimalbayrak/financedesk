@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import * as XLSX from 'xlsx'
+import { ccStatementSchema } from '@/lib/schemas'
+import { extractDocumentText } from '@/lib/document/extract-text'
+import { extractStructuredData } from '@/lib/ai/gemini'
+import { getFileHash, getCachedResult, setCachedResult } from '@/lib/cache'
 
 export const maxDuration = 60
 
@@ -18,46 +20,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'API anahtarı bulunamadı. Lütfen GEMINI_API_KEY ortam değişkenini ayarlayın.' }, { status: 400 })
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
-      }
-    })
-
     const ccPrompt = `
       Sen uzman bir kredi kartı hesap ekstresi analizörü yapay zekasın. 
-      Sana bir veya daha fazla "Kredi Kartı Hesap Ekstresi" (Credit Card Statement) dosyası veriyorum.
+      Sana bir "Kredi Kartı Hesap Ekstresi" metin verisi veriyorum.
       
       GÖREVİN:
       1. Ekstreden Kart Toplam Limitini (card_limit) ve Ekstre Dönem Borcunu (statement_debt) tespit edebiliyorsan TL cinsinden yaz (bulamazsan null ver).
       2. Ekstredaki tüm kart harcamalarını (alışverişleri) ve ödemeleri/iadeleri çıkar.
       
       ÖNEMLİ KURALLAR:
-      - Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI METİN (string) formatında "amount_raw" alanına yaz.
+      - Tutarları metinde nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI formatta (string) "amount_raw" alanına yaz.
       - HARCAMA/ALIŞVERİŞ ise tutarı POZİTİF bir değer yap (örn: "250,50").
       - ÖDEME/İADE/ALACAK ise tutarı NEGATİF yap (örn: "-1.500,00").
       - Tarih formatını her zaman YYYY-MM-DD olarak ver.
-      
-      Döndürmen gereken JSON formatı:
-      {
-        "card_limit": "150000.00",
-        "statement_debt": "12345.50",
-        "transactions": [
-          {
-            "date": "2025-01-01",
-            "description": "MIGROS TURK T.A.S.",
-            "amount_raw": "123,45"
-          },
-          {
-            "date": "2025-01-05",
-            "description": "KART ODEMESI - EFT/HAVALE",
-            "amount_raw": "-2.500,00"
-          }
-        ]
-      }
     `
 
     let allTransactions: any[] = []
@@ -67,70 +42,48 @@ export async function POST(req: NextRequest) {
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
+      
+      // Hash check
+      const hash = getFileHash(buffer)
+      const cached = getCachedResult(hash)
+      if (cached) {
+        console.log('Returning cached CC result for', hash)
+        allTransactions = [...allTransactions, ...cached.transactions]
+        if (cached.limit && !detectedLimit) detectedLimit = cached.limit
+        if (cached.debt && !detectedDebt) detectedDebt = cached.debt
+        continue
+      }
+
       const ext = file.name.split('.').pop()?.toLowerCase() || ''
-
-      let mimeType = 'application/pdf'
-      if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) {
-        mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`
-      } else if (ext === 'pdf') {
-        mimeType = 'application/pdf'
+      const extracted = await extractDocumentText(buffer, ext)
+      
+      if (extracted.error) {
+        if (extracted.requiresOCR) {
+          return NextResponse.json({ requiresOCR: true, error: extracted.error }, { status: 422 })
+        }
+        return NextResponse.json({ error: extracted.error }, { status: 422 })
       }
 
-      let result
-      if (['xlsx', 'xls', 'csv'].includes(ext)) {
-        const workbook = XLSX.read(buffer, { type: 'buffer' })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
-        const csvData = XLSX.utils.sheet_to_csv(worksheet)
-
-        result = await model.generateContent([
-          ccPrompt + `\n\nAnaliz Edilecek Excel Verisi (CSV formatında):\n${csvData}`
-        ])
-      } else if (['txt', 'text'].includes(ext)) {
-        const textContent = buffer.toString('utf-8')
-        result = await model.generateContent([
-          ccPrompt + `\n\nAnaliz Edilecek Metin Verisi:\n${textContent}`
-        ])
-      } else {
-        result = await model.generateContent([
-          ccPrompt,
-          {
-            inlineData: {
-              data: buffer.toString('base64'),
-              mimeType: ext === 'pdf' ? 'application/pdf' : (file.type || 'application/pdf'),
-            },
-          },
-        ])
-      }
-
-      const responseText = result.response.text()
-      let cleanJson = responseText.trim()
-      if (cleanJson.startsWith('```json')) {
-        cleanJson = cleanJson.replace(/```json\n?/, '').replace(/\n?```$/, '')
-      } else if (cleanJson.startsWith('```')) {
-        cleanJson = cleanJson.replace(/```\n?/, '').replace(/\n?```$/, '')
-      }
-
-      let parsedData: any
-      try {
-        parsedData = JSON.parse(cleanJson)
-      } catch (err: any) {
-        console.error(`Gemini output for file ${file.name} is not valid JSON:`, responseText)
+      const parsedData = await extractStructuredData(extracted.text, ccPrompt, apiKey)
+      
+      // Validate
+      const validationResult = ccStatementSchema.safeParse(parsedData)
+      if (!validationResult.success) {
+        console.error('Zod validation failed for CC:', validationResult.error)
         return NextResponse.json({ 
-          error: `${file.name} dosyasının ekstre verileri çözümlenirken format hatası oluştu.`,
-          details: err.message 
+          error: `${file.name} dosyasının verileri çözümlenirken format hatası oluştu.`,
+          details: validationResult.error.issues
         }, { status: 422 })
       }
 
-      const rawTransactions = Array.isArray(parsedData) 
-        ? parsedData 
-        : (parsedData.transactions || parsedData.data || [])
+      const validatedData = validationResult.data
+      const rawTransactions = validatedData.transactions
 
-      if (parsedData.card_limit && !detectedLimit) {
-        detectedLimit = parseFloat(parsedData.card_limit)
+      if (validatedData.card_limit && !detectedLimit) {
+        detectedLimit = parseFloat(validatedData.card_limit)
       }
-      if (parsedData.statement_debt && !detectedDebt) {
-        detectedDebt = parseFloat(parsedData.statement_debt)
+      if (validatedData.statement_debt && !detectedDebt) {
+        detectedDebt = parseFloat(validatedData.statement_debt)
       }
 
       function parseAmount(raw: string | number | null | undefined): number {
@@ -176,12 +129,19 @@ export async function POST(req: NextRequest) {
       }
 
       const transactions = rawTransactions.map((t: any) => {
-        const amount = parseAmount(t.amount_raw || t.amount);
+        const amount = parseAmount(t.amount_raw);
         return {
-          transaction_date: t.date || t.transaction_date,
+          transaction_date: t.date,
           description: t.description,
           amount
         }
+      })
+
+      // Cache this file's result
+      setCachedResult(hash, {
+        transactions,
+        limit: detectedLimit,
+        debt: detectedDebt
       })
 
       allTransactions = [...allTransactions, ...transactions]
@@ -197,6 +157,9 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error('PDF CC Parsing Error:', error)
+    if (error.status === 429 || (error.message && error.message.includes('429'))) {
+      return NextResponse.json({ error: 'Yapay zeka kullanım limiti aşıldı. Lütfen 1 dakika bekleyip tekrar deneyin.' }, { status: 429 })
+    }
     return NextResponse.json(
       { error: `Yapay Zeka veya Sistem Hatası: ${error.message || 'Bilinmeyen hata'}` },
       { status: 500 }
