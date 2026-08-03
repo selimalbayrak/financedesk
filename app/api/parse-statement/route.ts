@@ -40,19 +40,26 @@ export async function POST(req: NextRequest) {
     
     // Extract text
     const extracted = await extractDocumentText(buffer, ext)
+    let inlineData = undefined
+
     if (extracted.error) {
       if (extracted.requiresOCR) {
-        return NextResponse.json({ requiresOCR: true, error: extracted.error }, { status: 422 })
+        // Fallback to Gemini Multimodal OCR
+        inlineData = {
+          data: buffer.toString('base64'),
+          mimeType: ext === 'pdf' ? 'application/pdf' : (file.type || 'application/pdf')
+        }
+      } else {
+        return NextResponse.json({ error: extracted.error }, { status: 422 })
       }
-      return NextResponse.json({ error: extracted.error }, { status: 422 })
     }
 
     const ledgerPrompt = `
       Sen uzman bir muhasebeci ve veri çıkarıcı yapay zekasın. 
-      Sana bir "Cari Hesap Ekstresi" (Ledger/Account Statement) metin verisi veriyorum.
-      Bu metindeki işlemleri (satırları) analiz et ve JSON array olarak döndür.
+      Sana bir "Cari Hesap Ekstresi" (Ledger/Account Statement) belgesi veya metin verisi veriyorum.
+      Bu verideki işlemleri (satırları) analiz et ve JSON array olarak döndür.
       
-      ÇOK ÖNEMLİ: Tutarları metinde nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI formatta (string) "debit_raw" ve "credit_raw" alanlarına yaz. Dönüştürme/hesaplama yapma. Boşsa veya çizgi varsa "0" yaz.
+      ÇOK ÖNEMLİ: Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI formatta (string) "debit_raw" ve "credit_raw" alanlarına yaz. Dönüştürme/hesaplama yapma. Boşsa veya çizgi varsa "0" yaz.
       
       Tarih formatını YYYY-MM-DD olarak ver.
       Belge numarası, fiş türü ve açıklamayı çıkar.
@@ -60,10 +67,10 @@ export async function POST(req: NextRequest) {
 
     const bankPrompt = `
       Sen uzman bir banka hesap ekstresi analizörü yapay zekasın. 
-      Sana bir "Banka Hesap Ekstresi" (Bank Statement) metin verisi veriyorum.
-      Bu metindeki işlemleri (hesap hareketleri) analiz et ve JSON array olarak döndür.
+      Sana bir "Banka Hesap Ekstresi" (Bank Statement) belgesi veya metin verisi veriyorum.
+      Bu verideki işlemleri (hesap hareketleri) analiz et ve JSON array olarak döndür.
       
-      ÇOK ÖNEMLİ: Tutarları metinde nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI formatta (string) "debit_raw" ve "credit_raw" alanlarına yaz. Dönüştürme/hesaplama yapma. Boşsa veya çizgi varsa "0" yaz.
+      ÇOK ÖNEMLİ: Tutarları veride nasıl görüyorsan (nokta ve virgülleriyle beraber) TAM OLARAK AYNI formatta (string) "debit_raw" ve "credit_raw" alanlarına yaz. Dönüştürme/hesaplama yapma. Boşsa veya çizgi varsa "0" yaz.
       
       Eğer hesaba para GİRDİYSE (Yatan/Alacak/Credit) "credit_raw" alanına, hesaptan para ÇIKTIYSA (Çekilen/Borç/Debit) "debit_raw" alanına yaz (diğeri "0" olsun).
       
@@ -73,7 +80,7 @@ export async function POST(req: NextRequest) {
     const promptText = statementType === 'bank' ? bankPrompt : ledgerPrompt
 
     // Call Gemini
-    const rawTransactions = await extractStructuredData(extracted.text, promptText, apiKey)
+    const rawTransactions = await extractStructuredData(extracted.text || '', promptText, apiKey, inlineData)
 
     // Validate with Zod
     const validationResult = statementArraySchema.safeParse(rawTransactions)

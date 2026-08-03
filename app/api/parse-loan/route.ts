@@ -33,12 +33,18 @@ export async function POST(req: NextRequest) {
 
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     const extracted = await extractDocumentText(buffer, ext)
+    let inlineData = undefined
     
     if (extracted.error) {
       if (extracted.requiresOCR) {
-        return NextResponse.json({ requiresOCR: true, error: extracted.error }, { status: 422 })
+        // Fallback to Gemini Multimodal OCR
+        inlineData = {
+          data: buffer.toString('base64'),
+          mimeType: ext === 'pdf' ? 'application/pdf' : (file.type || 'application/pdf')
+        }
+      } else {
+        return NextResponse.json({ error: extracted.error }, { status: 422 })
       }
-      return NextResponse.json({ error: extracted.error }, { status: 422 })
     }
 
     const prompt = `
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest) {
          - amount_due: Ödenecek taksit tutarı (Float olarak)
     `
 
-    const parsedData = await extractStructuredData(extracted.text, prompt, apiKey)
+    const parsedData = await extractStructuredData(extracted.text || '', prompt, apiKey, inlineData)
     
     // Validate
     const validationResult = loanStatementSchema.safeParse(parsedData)
