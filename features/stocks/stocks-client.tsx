@@ -486,9 +486,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
 
       {/* Modal 1: Add/Edit Stock */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <form onSubmit={handleStockSubmit} className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] flex flex-col">
+          <form onSubmit={handleStockSubmit} className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-2 border-b shrink-0">
               <h3 className="font-bold text-lg text-primary flex items-center gap-2">
                 <Package className="w-5 h-5" />
@@ -616,9 +616,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
 
       {/* Modal 2: Stock Movement (Giriş/Çıkış) */}
       {showMovementModal && movementStock && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowMovementModal(false)} />
-          <form onSubmit={handleMovementSubmit} className="relative bg-card border w-full max-w-sm p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up">
+          <form onSubmit={handleMovementSubmit} className="relative bg-card border w-full max-w-sm p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between pb-2 border-b">
               <h3 className="font-bold text-lg text-primary flex items-center gap-2">
                 <ArrowRightLeft className="w-5 h-5" />
