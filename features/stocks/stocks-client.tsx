@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, Pencil, Trash2, X, RefreshCw, ArrowRightLeft } from 'lucide-react'
+import { Plus, Search, Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, Pencil, Trash2, X, RefreshCw, ArrowRightLeft, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/utils'
 import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory } from './actions'
 import { toast } from 'sonner'
+import { useHotkeys } from 'react-hotkeys-hook'
+import * as XLSX from 'xlsx'
 import type { Stock, StockMovement, Account, StockCategory } from '@/types/database.types'
 
 interface StocksClientProps {
@@ -33,6 +35,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   const [newCatName, setNewCatName] = useState('')
   const [selectedCatId, setSelectedCatId] = useState<string>('')
   const [attributes, setAttributes] = useState<Record<string, any>>({})
+  const [stockCode, setStockCode] = useState<string>('')
 
   // Stock Movement Modal State
   const [showMovementModal, setShowMovementModal] = useState(false)
@@ -48,9 +51,15 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
 
   // Set trackMinStock when editing
   useEffect(() => {
-    if (editStock && Number(editStock.min_stock_level) > 0) {
-      setTrackMinStock(true)
-    } else if (!editStock) {
+    if (editStock) {
+      setStockCode(editStock.code)
+      if (Number(editStock.min_stock_level) > 0) {
+        setTrackMinStock(true)
+      } else {
+        setTrackMinStock(false)
+      }
+    } else {
+      setStockCode('')
       setTrackMinStock(false)
     }
   }, [editStock])
@@ -76,27 +85,52 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   const handleCategoryChange = (val: string | null) => {
     if (!val) return
     if (val === 'new') {
-      const name = prompt('Yeni Kategori Adı:')
+      const name = window.prompt('Yeni Kategori Adı:')
       if (name) {
-        handleCreateCategory(name)
+        const baseCode = window.prompt('Kategori Başlangıç Kodu (Örn: 2000, ARB-100):')
+        handleCreateCategory(name, baseCode || undefined)
       }
     } else {
       setSelectedCatId(val)
       if (!editStock || editStock.category_id !== val) {
         setAttributes({}) // reset attributes on category change
+        
+        // Auto-increment stock code
+        const cat = stockCategories.find(c => c.id === val)
+        if (cat?.base_code) {
+          const basePrefix = cat.base_code.replace(/\d+$/, '') // Extract prefix (e.g., "ARB-" from "ARB-100")
+          const catStocks = stocks.filter(s => s.category_id === val && s.code.startsWith(basePrefix))
+          
+          if (catStocks.length > 0) {
+            let maxNum = parseInt(cat.base_code.match(/\d+$/)?.[0] || '0', 10) - 1
+            catStocks.forEach(s => {
+              const match = s.code.match(/\d+$/)
+              if (match) {
+                const num = parseInt(match[0], 10)
+                if (num > maxNum) maxNum = num
+              }
+            })
+            setStockCode(basePrefix + (maxNum + 1))
+          } else {
+            setStockCode(cat.base_code)
+          }
+        }
       }
     }
   }
 
-  const handleCreateCategory = async (name: string) => {
+  const handleCreateCategory = async (name: string, baseCode?: string) => {
     setLoading(true)
-    const res = await createStockCategory(name, []) // Empty fields for generic new category
+    const res = await createStockCategory(name, [], baseCode) // Empty fields for generic new category
     if (res.error) {
       toast.error(res.error)
     } else if (res.data) {
       toast.success('Kategori eklendi!')
       setStockCategories([...stockCategories, res.data])
       setSelectedCatId(res.data.id)
+      if (res.data.base_code) {
+        setStockCode(res.data.base_code)
+      }
     }
     setLoading(false)
   }
@@ -183,6 +217,43 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
     }
   }
 
+  const handleOpenAddModal = () => {
+    setEditStock(null)
+    setStockCode('')
+    setSelectedCatId('')
+    setAttributes({})
+    setShowAddModal(true)
+  }
+
+  // Hotkeys
+  useHotkeys('ctrl+n, cmd+n', (e) => {
+    e.preventDefault()
+    handleOpenAddModal()
+  }, { enableOnFormTags: false })
+
+  useHotkeys('ctrl+e, cmd+e', (e) => {
+    e.preventDefault()
+    exportToExcel()
+  }, { enableOnFormTags: false })
+
+  const exportToExcel = () => {
+    const data = filteredStocks.map(s => ({
+      'Stok Kodu': s.code,
+      'Stok Adı': s.name,
+      'Kategori': s.category || '',
+      'Birim': s.unit || '',
+      'Birim Fiyatı': s.unit_price / 100,
+      'Miktar': s.quantity_on_hand,
+      'Kritik Seviye': s.min_stock_level,
+      'Açıklama': s.description || '',
+      'Oluşturan (ID)': s.created_by || ''
+    }))
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Stok_Listesi")
+    XLSX.writeFile(wb, "Stok_Listesi.xlsx")
+  }
+
   return (
     <div className="space-y-6 pb-24 text-left">
       {/* Header */}
@@ -196,10 +267,16 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
             Deponuzdaki tüm hammaddeleri, mamulleri ve stok hareketlerini anlık takip edin.
           </p>
         </div>
-        <Button onClick={() => { setEditStock(null); setSelectedCatId(''); setAttributes({}); setShowAddModal(true) }} className="rounded-xl shadow-md gap-2 cursor-pointer">
-          <Plus className="w-4 h-4" />
-          Yeni Stok Ekle
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportToExcel} title="Excel'e Aktar (Ctrl+E)" className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 rounded-lg">
+            <Download className="w-4 h-4" />
+            Dışa Aktar
+          </Button>
+          <Button onClick={handleOpenAddModal} title="Yeni Stok Ekle (Ctrl+N)" className="rounded-xl shadow-md gap-2 cursor-pointer">
+            <Plus className="w-4 h-4" />
+            Yeni Stok Ekle
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -503,7 +580,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="code">Stok Kodu *</Label>
-                  <Input id="code" name="code" defaultValue={editStock?.code || `STK-${Math.floor(1000 + Math.random() * 9000)}`} required className="h-9 rounded-lg" />
+                  <Input id="code" name="code" value={stockCode} onChange={(e) => setStockCode(e.target.value)} required className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="unit">Birim</Label>

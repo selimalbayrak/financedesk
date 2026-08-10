@@ -20,18 +20,22 @@ export async function getStockCategories() {
   return { success: true, data }
 }
 
-export async function createStockCategory(name: string, fields: { name: string; type: string }[]) {
+export async function createStockCategory(name: string, fields: { name: string; type: string }[], base_code?: string) {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) return { error: 'Company not found' }
 
   const supabase = await createClient()
+  const { data: authData } = await supabase.auth.getUser()
+  const created_by = authData.user?.id || null
 
   const { data, error } = await supabase
     .from('stock_categories')
     .insert({
       company_id: companyInfo.id,
       name,
-      fields
+      base_code: base_code || null,
+      fields,
+      created_by
     } as any)
     .select()
     .single()
@@ -56,6 +60,8 @@ export async function createStock(data: {
   if (!companyInfo) return { error: 'Company not found' }
 
   const supabase = await createClient()
+  const { data: authData } = await supabase.auth.getUser()
+  const created_by = authData.user?.id || null
 
   const { data: stock, error } = await supabase
     .from('stocks')
@@ -69,7 +75,8 @@ export async function createStock(data: {
       unit_price: data.unit_price,
       quantity_on_hand: data.quantity_on_hand,
       min_stock_level: data.min_stock_level || 0,
-      description: data.description || null
+      description: data.description || null,
+      created_by
     } as any)
     .select()
     .single()
@@ -85,7 +92,8 @@ export async function createStock(data: {
       quantity: data.quantity_on_hand,
       unit_price: data.unit_price,
       total_amount: data.quantity_on_hand * data.unit_price,
-      notes: 'Başlangıç Stok Girişi'
+      notes: 'Başlangıç Stok Girişi',
+      created_by
     } as any)
   }
 
@@ -180,11 +188,11 @@ export async function addStockMovement(data: {
   
   let transaction_id: string | null = null
 
+  const { data: authData } = await supabase.auth.getUser()
+  const user_id = authData.user?.id || null
+
   // 2. Insert transaction if account_id is provided
   if (data.account_id) {
-    const { data: authData } = await supabase.auth.getUser()
-    const user_id = authData.user?.id
-    
     if (user_id) {
       const { data: trx, error: trxErr } = await supabase.from('transactions').insert({
         user_id,
@@ -196,7 +204,8 @@ export async function addStockMovement(data: {
         currency: 'TRY',
         transaction_date: new Date().toISOString().split('T')[0],
         description: `Stok İşlemi: ${stock.name} - ${data.quantity} Adet`,
-        notes: data.notes || null
+        notes: data.notes || null,
+        created_by: user_id
       } as any).select().single()
       
       if (!trxErr && trx) {
@@ -215,7 +224,8 @@ export async function addStockMovement(data: {
     quantity: data.quantity,
     unit_price: data.unit_price,
     total_amount,
-    notes: data.notes || (data.movement_type === 'in' ? 'Stok Girişi (Alış)' : 'Stok Çıkışı (Satış)')
+    notes: data.notes || (data.movement_type === 'in' ? 'Stok Girişi (Alış)' : 'Stok Çıkışı (Satış)'),
+    created_by: user_id
   } as any)
 
   if (moveErr) return { error: moveErr.message }

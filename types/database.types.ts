@@ -21,12 +21,13 @@ export interface Database {
           tax_office: string | null
           email: string | null
           phone: string | null
-          address: string | null
           city: string | null
+          address: string | null
           notes: string | null
           is_active: boolean
           created_at: string
           updated_at: string
+          created_by: string | null
           deleted_at: string | null
         }
         Insert: Omit<Database['public']['Tables']['accounts']['Row'], 'id' | 'created_at' | 'updated_at'>
@@ -204,8 +205,10 @@ export interface Database {
           id: string
           company_id: string
           name: string
+          base_code: string | null
           fields: { name: string; type: string }[]
           created_at: string
+          created_by: string | null
           updated_at: string
         }
         Insert: Omit<Database['public']['Tables']['stock_categories']['Row'], 'id' | 'created_at' | 'updated_at'>
@@ -307,8 +310,10 @@ export type StockCategory = {
   id: string
   company_id: string
   name: string
+  base_code: string | null
   fields: { name: string; type: string }[]
   created_at: string
+  created_by: string | null
   updated_at: string
 }
 
@@ -325,6 +330,7 @@ export type Stock = {
   quantity_on_hand: number
   min_stock_level: number
   description: string | null
+  created_by: string | null
   created_at: string
   updated_at: string
   stock_categories?: StockCategory | null
@@ -342,6 +348,7 @@ export type StockMovement = {
   total_amount: number
   movement_date: string
   notes: string | null
+  created_by: string | null
   created_at: string
   stock?: Stock
   account?: Account
