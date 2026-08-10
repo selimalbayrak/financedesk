@@ -284,7 +284,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                   <SelectTrigger className="h-9 w-36 text-xs rounded-xl truncate">
                     <SelectValue placeholder="Kategori" />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border">
+                  <SelectContent className="bg-card border z-[200]">
                     <SelectItem value="all">Tüm Kategoriler</SelectItem>
                     {catFilterOptions.map(cat => (
                       <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
@@ -511,7 +511,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                     <SelectTrigger className="h-9 rounded-lg">
                       <SelectValue placeholder="Birim Seç" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card border">
+                    <SelectContent className="bg-card border z-[200]">
                       <SelectItem value="Adet">Adet</SelectItem>
                       <SelectItem value="Kg">Kg</SelectItem>
                       <SelectItem value="Gram">Gram</SelectItem>
@@ -538,7 +538,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                     <SelectTrigger className="h-9 rounded-lg truncate w-full">
                       <SelectValue placeholder="Kategori Seç" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card border max-w-[200px]">
+                    <SelectContent className="bg-card border z-[200] max-w-[200px]">
                       {stockCategories.map(cat => (
                         <SelectItem key={cat.id} value={cat.id} className="truncate">{cat.name}</SelectItem>
                       ))}
@@ -641,7 +641,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                   <SelectTrigger className="h-9 rounded-lg">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border">
+                  <SelectContent className="bg-card border z-[200]">
                     <SelectItem value="in">Stok Girişi (Alış/Depoya Ekle)</SelectItem>
                     <SelectItem value="out">Stok Çıkışı (Satış/Depodan Düş)</SelectItem>
                   </SelectContent>
@@ -665,7 +665,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                   <SelectTrigger className="h-9 rounded-lg">
                     <SelectValue placeholder="Cari hesap seçin..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-card border">
+                  <SelectContent className="bg-card border z-[200]">
                     <SelectItem value="">Seçim Yok</SelectItem>
                     {accounts.map(acc => (
                       <SelectItem key={acc.id} value={acc.id}>
