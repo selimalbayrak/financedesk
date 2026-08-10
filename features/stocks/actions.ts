@@ -4,10 +4,48 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getActiveCompany } from '@/lib/company'
 
+export async function getStockCategories() {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Company not found' }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('stock_categories')
+    .select('*')
+    .eq('company_id', companyInfo.id)
+    .order('name')
+
+  if (error) return { error: error.message }
+  return { success: true, data }
+}
+
+export async function createStockCategory(name: string, fields: { name: string; type: string }[]) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Company not found' }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('stock_categories')
+    .insert({
+      company_id: companyInfo.id,
+      name,
+      fields
+    } as any)
+    .select()
+    .single()
+
+  if (error) return { error: error.message }
+
+  return { success: true, data }
+}
+
 export async function createStock(data: {
   code: string
   name: string
-  category?: string
+  category_id?: string
+  attributes?: Record<string, any>
   unit?: string
   unit_price: number // in cents
   quantity_on_hand: number
@@ -25,7 +63,8 @@ export async function createStock(data: {
       company_id: companyInfo.id,
       code: data.code,
       name: data.name,
-      category: data.category || null,
+      category_id: data.category_id || null,
+      attributes: data.attributes || {},
       unit: data.unit || 'Adet',
       unit_price: data.unit_price,
       quantity_on_hand: data.quantity_on_hand,
@@ -58,7 +97,8 @@ export async function createStock(data: {
 export async function updateStock(id: string, data: {
   code: string
   name: string
-  category?: string
+  category_id?: string
+  attributes?: Record<string, any>
   unit?: string
   unit_price: number
   quantity_on_hand: number
@@ -75,7 +115,8 @@ export async function updateStock(id: string, data: {
     .update({
       code: data.code,
       name: data.name,
-      category: data.category || null,
+      category_id: data.category_id || null,
+      attributes: data.attributes || {},
       unit: data.unit || 'Adet',
       unit_price: data.unit_price,
       quantity_on_hand: data.quantity_on_hand,
@@ -136,12 +177,40 @@ export async function addStockMovement(data: {
   if (fetchErr || !stock) return { error: 'Stok ürünü bulunamadı.' }
 
   const total_amount = Math.round(data.quantity * data.unit_price)
+  
+  let transaction_id: string | null = null
 
-  // 2. Insert stock movement
+  // 2. Insert transaction if account_id is provided
+  if (data.account_id) {
+    const { data: authData } = await supabase.auth.getUser()
+    const user_id = authData.user?.id
+    
+    if (user_id) {
+      const { data: trx, error: trxErr } = await supabase.from('transactions').insert({
+        user_id,
+        company_id: companyInfo.id,
+        account_id: data.account_id,
+        transaction_type: data.movement_type === 'in' ? 'invoice_in' : 'invoice_out', // Alış faturası (borç artar) veya Satış faturası (alacak artar)
+        category: 'Stok',
+        amount: total_amount,
+        currency: 'TRY',
+        transaction_date: new Date().toISOString().split('T')[0],
+        description: `Stok İşlemi: ${stock.name} - ${data.quantity} Adet`,
+        notes: data.notes || null
+      } as any).select().single()
+      
+      if (!trxErr && trx) {
+        transaction_id = trx.id
+      }
+    }
+  }
+
+  // 3. Insert stock movement
   const { error: moveErr } = await supabase.from('stock_movements').insert({
     company_id: companyInfo.id,
     stock_id: data.stock_id,
     account_id: data.account_id || null,
+    transaction_id: transaction_id,
     movement_type: data.movement_type,
     quantity: data.quantity,
     unit_price: data.unit_price,
@@ -151,7 +220,7 @@ export async function addStockMovement(data: {
 
   if (moveErr) return { error: moveErr.message }
 
-  // 3. Update stock quantity_on_hand
+  // 4. Update stock quantity_on_hand
   const newQty = data.movement_type === 'in'
     ? Number(stock.quantity_on_hand || 0) + Number(data.quantity)
     : Number(stock.quantity_on_hand || 0) - Number(data.quantity)
@@ -160,12 +229,14 @@ export async function addStockMovement(data: {
     .from('stocks')
     .update({
       quantity_on_hand: newQty,
-      unit_price: data.unit_price,
+      unit_price: data.unit_price, // Update unit price to latest cost/sale price?
       updated_at: new Date().toISOString()
     } as any)
     .eq('id', data.stock_id)
 
   revalidatePath('/stocks')
+  revalidatePath('/accounts')
+  revalidatePath('/transactions')
   revalidatePath('/')
   return { success: true }
 }

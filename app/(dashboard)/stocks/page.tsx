@@ -20,11 +20,12 @@ export default async function StocksPage() {
   const [
     { data: stocks },
     { data: movements },
-    { data: accounts }
+    { data: accounts },
+    { data: stockCategories }
   ] = await Promise.all([
     supabase
       .from('stocks')
-      .select('*')
+      .select('*, stock_categories(*)')
       .eq('company_id', companyInfo.id)
       .order('code'),
     supabase
@@ -37,14 +38,34 @@ export default async function StocksPage() {
       .select('*')
       .eq('company_id', companyInfo.id)
       .is('deleted_at', null)
+      .order('name'),
+    supabase
+      .from('stock_categories')
+      .select('*')
+      .eq('company_id', companyInfo.id)
       .order('name')
   ])
+
+  // Insert default categories if none exist (for initial setup)
+  if (stockCategories && stockCategories.length === 0) {
+    const defaultCategories = [
+      { company_id: companyInfo.id, name: 'Araba', fields: [{name: 'Marka', type: 'text'}, {name: 'Model', type: 'text'}, {name: 'Yıl', type: 'number'}, {name: 'Plaka', type: 'text'}] },
+      { company_id: companyInfo.id, name: 'Tapu', fields: [{name: 'İl', type: 'text'}, {name: 'İlçe', type: 'text'}, {name: 'Mahalle', type: 'text'}, {name: 'Ada', type: 'text'}, {name: 'Parsel', type: 'text'}] },
+      { company_id: companyInfo.id, name: 'Yardımcı Malzeme', fields: [{name: 'Özellik', type: 'text'}] },
+      { company_id: companyInfo.id, name: 'Ham Madde', fields: [{name: 'Kalite', type: 'text'}, {name: 'Tür', type: 'text'}] }
+    ]
+    const { data: newCats } = await supabase.from('stock_categories').insert(defaultCategories).select()
+    if (newCats) {
+      stockCategories.push(...newCats)
+    }
+  }
 
   return (
     <StocksClient
       stocks={stocks ?? []}
       movements={movements ?? []}
       accounts={accounts ?? []}
+      stockCategories={stockCategories ?? []}
     />
   )
 }

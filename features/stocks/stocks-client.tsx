@@ -8,17 +8,18 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { createStock, updateStock, deleteStock, addStockMovement } from './actions'
+import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory } from './actions'
 import { toast } from 'sonner'
-import type { Stock, StockMovement, Account } from '@/types/database.types'
+import type { Stock, StockMovement, Account, StockCategory } from '@/types/database.types'
 
 interface StocksClientProps {
   stocks: Stock[]
   movements: StockMovement[]
   accounts: Account[]
+  stockCategories: StockCategory[]
 }
 
-export function StocksClient({ stocks, movements, accounts }: StocksClientProps) {
+export function StocksClient({ stocks, movements, accounts, stockCategories: initialCategories }: StocksClientProps) {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [activeTab, setActiveTab] = useState<'items' | 'movements'>('items')
@@ -26,6 +27,12 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
   // New Stock Modal State
   const [showAddModal, setShowAddModal] = useState(false)
   const [editStock, setEditStock] = useState<Stock | null>(null)
+  
+  // Category State
+  const [stockCategories, setStockCategories] = useState<StockCategory[]>(initialCategories)
+  const [newCatName, setNewCatName] = useState('')
+  const [selectedCatId, setSelectedCatId] = useState<string>('')
+  const [attributes, setAttributes] = useState<Record<string, any>>({})
 
   // Stock Movement Modal State
   const [showMovementModal, setShowMovementModal] = useState(false)
@@ -38,15 +45,15 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
 
   const [loading, setLoading] = useState(false)
 
-  // Unique categories
-  const categories = Array.from(new Set(stocks.map(s => s.category).filter(Boolean))) as string[]
+  // Unique categories for filter
+  const catFilterOptions = stockCategories.map(c => ({ id: c.id, name: c.name }))
 
   // Filtered stocks
   const filteredStocks = stocks.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) || 
                           s.code.toLowerCase().includes(search.toLowerCase()) ||
-                          (s.category && s.category.toLowerCase().includes(search.toLowerCase()))
-    const matchesCat = selectedCategory === 'all' || s.category === selectedCategory
+                          (s.stock_categories?.name?.toLowerCase().includes(search.toLowerCase()))
+    const matchesCat = selectedCategory === 'all' || s.category_id === selectedCategory
     return matchesSearch && matchesCat
   })
 
@@ -55,16 +62,48 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
   const lowStockItems = stocks.filter(s => Number(s.quantity_on_hand) <= Number(s.min_stock_level || 0))
   const totalValue = stocks.reduce((acc, s) => acc + (Number(s.quantity_on_hand) * Number(s.unit_price || 0)), 0)
 
+  // Handle Category Select
+  const handleCategoryChange = (val: string | null) => {
+    if (!val) return
+    if (val === 'new') {
+      const name = prompt('Yeni Kategori Adı:')
+      if (name) {
+        handleCreateCategory(name)
+      }
+    } else {
+      setSelectedCatId(val)
+      if (!editStock || editStock.category_id !== val) {
+        setAttributes({}) // reset attributes on category change
+      }
+    }
+  }
+
+  const handleCreateCategory = async (name: string) => {
+    setLoading(true)
+    const res = await createStockCategory(name, []) // Empty fields for generic new category
+    if (res.error) {
+      toast.error(res.error)
+    } else if (res.data) {
+      toast.success('Kategori eklendi!')
+      setStockCategories([...stockCategories, res.data])
+      setSelectedCatId(res.data.id)
+    }
+    setLoading(false)
+  }
+
   // Handle Add/Edit Stock Submit
   const handleStockSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     const formData = new FormData(e.currentTarget)
     
+    // Auto-save any new category fields entered that weren't in the DB?
+    // Skip for now, rely on `attributes` object populated by inputs.
     const data = {
       code: formData.get('code') as string,
       name: formData.get('name') as string,
-      category: formData.get('category') as string,
+      category_id: selectedCatId || undefined,
+      attributes: attributes,
       unit: formData.get('unit') as string || 'Adet',
       unit_price: Math.round(parseFloat(formData.get('unit_price') as string || '0') * 100),
       quantity_on_hand: parseFloat(formData.get('quantity_on_hand') as string || '0'),
@@ -147,7 +186,7 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
             Deponuzdaki tüm hammaddeleri, mamulleri ve stok hareketlerini anlık takip edin.
           </p>
         </div>
-        <Button onClick={() => { setEditStock(null); setShowAddModal(true) }} className="rounded-xl shadow-md gap-2 cursor-pointer">
+        <Button onClick={() => { setEditStock(null); setSelectedCatId(''); setAttributes({}); setShowAddModal(true) }} className="rounded-xl shadow-md gap-2 cursor-pointer">
           <Plus className="w-4 h-4" />
           Yeni Stok Ekle
         </Button>
@@ -230,15 +269,15 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
                 />
               </div>
 
-              {categories.length > 0 && (
+              {catFilterOptions.length > 0 && (
                 <Select value={selectedCategory} onValueChange={(val) => setSelectedCategory(val!)}>
                   <SelectTrigger className="h-9 w-36 text-xs rounded-xl">
                     <SelectValue placeholder="Kategori" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border">
                     <SelectItem value="all">Tüm Kategoriler</SelectItem>
-                    {categories.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    {catFilterOptions.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -331,6 +370,8 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
                                 className="h-8 w-8 rounded-lg cursor-pointer text-muted-foreground hover:text-primary"
                                 onClick={() => {
                                   setEditStock(stock)
+                                  setSelectedCatId(stock.category_id || '')
+                                  setAttributes(stock.attributes || {})
                                   setShowAddModal(true)
                                 }}
                               >
@@ -464,7 +505,17 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="category">Kategori</Label>
-                  <Input id="category" name="category" defaultValue={editStock?.category || ''} placeholder="Örn: Metal, Plastik" className="h-9 rounded-lg" />
+                  <Select value={selectedCatId} onValueChange={handleCategoryChange}>
+                    <SelectTrigger className="h-9 rounded-lg">
+                      <SelectValue placeholder="Kategori Seç" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      {stockCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      ))}
+                      <SelectItem value="new" className="text-primary font-medium">+ Yeni Kategori Oluştur</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="unit_price">Birim Fiyat (TL)</Label>
@@ -472,7 +523,29 @@ export function StocksClient({ stocks, movements, accounts }: StocksClientProps)
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {selectedCatId && stockCategories.find(c => c.id === selectedCatId)?.fields?.length ? (
+                <div className="p-3 bg-muted/30 border rounded-xl space-y-3 mt-2">
+                  <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                    <Package className="w-3 h-3" />
+                    Kategori Özellikleri
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {stockCategories.find(c => c.id === selectedCatId)?.fields.map(field => (
+                      <div key={field.name} className="space-y-1">
+                        <Label>{field.name}</Label>
+                        <Input 
+                          type={field.type === 'number' ? 'number' : 'text'}
+                          value={attributes[field.name] || ''}
+                          onChange={e => setAttributes({ ...attributes, [field.name]: e.target.value })}
+                          className="h-8 text-xs rounded-lg bg-background" 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-3 mt-2">
                 <div className="space-y-1">
                   <Label htmlFor="quantity_on_hand">Mevcut Stok Miktarı</Label>
                   <Input id="quantity_on_hand" name="quantity_on_hand" type="number" step="any" defaultValue={editStock?.quantity_on_hand || '0'} className="h-9 rounded-lg" />

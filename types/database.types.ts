@@ -199,6 +199,18 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['loan_installments']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['loan_installments']['Insert']>
       }
+      stock_categories: {
+        Row: {
+          id: string
+          company_id: string
+          name: string
+          fields: { name: string; type: string }[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['stock_categories']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['stock_categories']['Insert']>
+      }
     }
     Views: {
       account_balances: {
@@ -291,12 +303,23 @@ export type TransactionWithLines = Transaction & {
   transaction_lines: TransactionLine[]
 }
 
+export type StockCategory = {
+  id: string
+  company_id: string
+  name: string
+  fields: { name: string; type: string }[]
+  created_at: string
+  updated_at: string
+}
+
 export type Stock = {
   id: string
   company_id: string
   code: string
   name: string
-  category: string | null
+  category_id: string | null
+  category?: string | null
+  attributes?: Record<string, any>
   unit: string | null
   unit_price: number
   quantity_on_hand: number
@@ -304,6 +327,7 @@ export type Stock = {
   description: string | null
   created_at: string
   updated_at: string
+  stock_categories?: StockCategory | null
 }
 
 export type StockMovement = {
