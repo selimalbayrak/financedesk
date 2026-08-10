@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Package, AlertTriangle, ArrowUpRight, ArrowDownLeft, Pencil, Trash2, X, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +44,16 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   const [movementNotes, setMovementNotes] = useState('')
 
   const [loading, setLoading] = useState(false)
+  const [trackMinStock, setTrackMinStock] = useState(false)
+
+  // Set trackMinStock when editing
+  useEffect(() => {
+    if (editStock && Number(editStock.min_stock_level) > 0) {
+      setTrackMinStock(true)
+    } else if (!editStock) {
+      setTrackMinStock(false)
+    }
+  }, [editStock])
 
   // Unique categories for filter
   const catFilterOptions = stockCategories.map(c => ({ id: c.id, name: c.name }))
@@ -271,7 +281,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
 
               {catFilterOptions.length > 0 && (
                 <Select value={selectedCategory} onValueChange={(val) => setSelectedCategory(val!)}>
-                  <SelectTrigger className="h-9 w-36 text-xs rounded-xl">
+                  <SelectTrigger className="h-9 w-36 text-xs rounded-xl truncate">
                     <SelectValue placeholder="Kategori" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border">
@@ -312,7 +322,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                     </tr>
                   ) : (
                     filteredStocks.map(stock => {
-                      const isLow = Number(stock.quantity_on_hand) <= Number(stock.min_stock_level || 0)
+                      const isLow = Number(stock.min_stock_level) > 0 && Number(stock.quantity_on_hand) <= Number(stock.min_stock_level)
                       const stockVal = Number(stock.quantity_on_hand) * Number(stock.unit_price || 0)
 
                       return (
@@ -327,9 +337,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs">
-                            {stock.category ? (
+                            {stock.stock_categories?.name ? (
                               <span className="bg-muted px-2 py-0.5 rounded-md font-medium">
-                                {stock.category}
+                                {stock.stock_categories.name}
                               </span>
                             ) : '—'}
                           </td>
@@ -343,11 +353,15 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                             {formatCurrency(stockVal)}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                              isLow ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-                            }`}>
-                              {isLow ? 'Azaldı' : 'Yeterli'}
-                            </span>
+                            {Number(stock.min_stock_level) > 0 ? (
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                                isLow ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                              }`}>
+                                {isLow ? 'Azaldı' : 'Yeterli'}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-1">
@@ -474,8 +488,8 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <form onSubmit={handleStockSubmit} className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up">
-            <div className="flex items-center justify-between pb-2 border-b">
+          <form onSubmit={handleStockSubmit} className="relative bg-card border w-full max-w-md p-6 rounded-3xl shadow-lg space-y-4 z-10 animate-in-up max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-2 border-b shrink-0">
               <h3 className="font-bold text-lg text-primary flex items-center gap-2">
                 <Package className="w-5 h-5" />
                 {editStock ? 'Stok Ürününü Düzenle' : 'Yeni Stok Kartı Ekle'}
@@ -485,15 +499,30 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
               </Button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto pr-2 pb-2 -mr-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="code">Stok Kodu *</Label>
                   <Input id="code" name="code" defaultValue={editStock?.code || `STK-${Math.floor(1000 + Math.random() * 9000)}`} required className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="unit">Birim (Örn: Adet, Metre, Kg)</Label>
-                  <Input id="unit" name="unit" defaultValue={editStock?.unit || 'Adet'} required className="h-9 rounded-lg" />
+                  <Label htmlFor="unit">Birim</Label>
+                  <Select name="unit" defaultValue={editStock?.unit || 'Adet'}>
+                    <SelectTrigger className="h-9 rounded-lg">
+                      <SelectValue placeholder="Birim Seç" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border">
+                      <SelectItem value="Adet">Adet</SelectItem>
+                      <SelectItem value="Kg">Kg</SelectItem>
+                      <SelectItem value="Gram">Gram</SelectItem>
+                      <SelectItem value="Litre">Litre</SelectItem>
+                      <SelectItem value="Ton">Ton</SelectItem>
+                      <SelectItem value="Metre">Metre</SelectItem>
+                      <SelectItem value="Paket">Paket</SelectItem>
+                      <SelectItem value="Kutu">Kutu</SelectItem>
+                      <SelectItem value="Çuval">Çuval</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -505,13 +534,13 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="category">Kategori</Label>
-                  <Select value={selectedCatId} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="h-9 rounded-lg">
+                  <Select value={selectedCatId || undefined} onValueChange={handleCategoryChange}>
+                    <SelectTrigger className="h-9 rounded-lg truncate w-full">
                       <SelectValue placeholder="Kategori Seç" />
                     </SelectTrigger>
-                    <SelectContent className="bg-card border">
+                    <SelectContent className="bg-card border max-w-[200px]">
                       {stockCategories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        <SelectItem key={cat.id} value={cat.id} className="truncate">{cat.name}</SelectItem>
                       ))}
                       <SelectItem value="new" className="text-primary font-medium">+ Yeni Kategori Oluştur</SelectItem>
                     </SelectContent>
@@ -532,7 +561,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                   <div className="grid grid-cols-2 gap-3">
                     {stockCategories.find(c => c.id === selectedCatId)?.fields.map(field => (
                       <div key={field.name} className="space-y-1">
-                        <Label>{field.name}</Label>
+                        <Label className="truncate">{field.name}</Label>
                         <Input 
                           type={field.type === 'number' ? 'number' : 'text'}
                           value={attributes[field.name] || ''}
@@ -545,15 +574,30 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                <div className="space-y-1">
-                  <Label htmlFor="quantity_on_hand">Mevcut Stok Miktarı</Label>
-                  <Input id="quantity_on_hand" name="quantity_on_hand" type="number" step="any" defaultValue={editStock?.quantity_on_hand || '0'} className="h-9 rounded-lg" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="min_stock_level">Kritik Stok Uyarısı (Min Limit)</Label>
-                  <Input id="min_stock_level" name="min_stock_level" type="number" step="any" defaultValue={editStock?.min_stock_level || '10'} className="h-9 rounded-lg" />
-                </div>
+              <div className="space-y-1 mt-2">
+                <Label htmlFor="quantity_on_hand">Mevcut Stok Miktarı</Label>
+                <Input id="quantity_on_hand" name="quantity_on_hand" type="number" step="any" defaultValue={editStock?.quantity_on_hand || '0'} className="h-9 rounded-lg" />
+              </div>
+
+              <div className="p-3 bg-muted/20 border rounded-xl space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={trackMinStock} 
+                    onChange={e => setTrackMinStock(e.target.checked)} 
+                    className="rounded border-input text-primary focus:ring-primary h-4 w-4"
+                  />
+                  <span className="font-medium text-foreground">Kritik Stok Uyarısı Kullan</span>
+                </label>
+                {trackMinStock && (
+                  <div className="pl-6 space-y-1 animate-in-up fade-in duration-200">
+                    <Label htmlFor="min_stock_level" className="text-muted-foreground">Uyarı Sınırı (Min Limit)</Label>
+                    <Input id="min_stock_level" name="min_stock_level" type="number" step="any" defaultValue={editStock?.min_stock_level || '10'} className="h-9 rounded-lg" />
+                  </div>
+                )}
+                {!trackMinStock && (
+                  <input type="hidden" name="min_stock_level" value="0" />
+                )}
               </div>
 
               <div className="space-y-1">
@@ -562,7 +606,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className="flex justify-end gap-2 pt-3 border-t shrink-0">
               <Button type="button" variant="ghost" onClick={() => setShowAddModal(false)} className="rounded-xl">İptal</Button>
               <Button type="submit" disabled={loading} className="rounded-xl px-6">{loading ? 'Kaydediliyor...' : 'Kaydet'}</Button>
             </div>
