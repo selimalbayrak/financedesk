@@ -84,20 +84,11 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   // Handle Category Select
   const handleCategoryChange = (val: string | null) => {
     if (!val) return
-    if (val === 'new') {
-      const name = window.prompt('Yeni Kategori Adı:')
-      if (name) {
-        const mainCode = window.prompt('Ana Hesap Kodu (Örn: 150, 153):')
-        const subCode = window.prompt('Alt Hesap Kodu (Örn: 01, 02):')
-        const baseCode = mainCode && subCode ? `${mainCode}.${subCode}` : undefined
-        handleCreateCategory(name, baseCode)
-      }
-    } else {
-      setSelectedCatId(val)
-      if (!editStock || editStock.category_id !== val) {
-        setAttributes({}) // reset attributes on category change
-        
-        // Auto-increment stock code (Tree format: 150.01.001)
+    setSelectedCatId(val)
+    if (!editStock || editStock.category_id !== val) {
+      setAttributes({}) // reset attributes on category change
+      
+      // Auto-increment stock code (Tree format: 150.01.001)
         const cat = stockCategories.find(c => c.id === val)
         if (cat?.base_code) {
           const prefix = cat.base_code + '.'
@@ -117,8 +108,6 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
         }
       }
     }
-  }
-
   const handleCreateCategory = async (name: string, baseCode?: string) => {
     setLoading(true)
     const res = await createStockCategory(name, [], baseCode) // Empty fields for generic new category
@@ -281,12 +270,10 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
           </p>
         </div>
         <div className="flex gap-2">
-          {stockCategories.length === 0 && stocks.length === 0 && (
-            <Button variant="outline" onClick={handleInitAccounts} className="border-red-200 text-red-600 hover:bg-red-50 gap-2 rounded-lg">
-              <RefreshCw className="w-4 h-4" />
-              Tekdüzeni Başlat
-            </Button>
-          )}
+          <Button variant="outline" onClick={handleInitAccounts} className="border-red-200 text-red-600 hover:bg-red-50 gap-2 rounded-lg">
+            <RefreshCw className="w-4 h-4" />
+            Tekdüzeni Başlat (Eski Verileri Siler)
+          </Button>
           <Button variant="outline" onClick={exportToExcel} title="Excel'e Aktar (Ctrl+E)" className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 rounded-lg">
             <Download className="w-4 h-4" />
             Dışa Aktar
@@ -638,7 +625,6 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                       {stockCategories.map(cat => (
                         <SelectItem key={cat.id} value={cat.id} className="truncate">{cat.name}</SelectItem>
                       ))}
-                      <SelectItem value="new" className="text-primary font-medium">+ Yeni Kategori Oluştur</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
