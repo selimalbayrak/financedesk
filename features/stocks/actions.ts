@@ -250,3 +250,59 @@ export async function addStockMovement(data: {
   revalidatePath('/')
   return { success: true }
 }
+
+export async function initializeUniformChartOfAccounts() {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Company not found' }
+
+  const supabase = await createClient()
+  const { data: authData } = await supabase.auth.getUser()
+  const created_by = authData.user?.id || null
+
+  // 1. Delete all existing stock movements to remove foreign key constraints
+  const { error: err1 } = await supabase
+    .from('stock_movements')
+    .delete()
+    .eq('company_id', companyInfo.id)
+  if (err1) return { error: err1.message }
+
+  // 2. Delete all existing stocks
+  const { error: err2 } = await supabase
+    .from('stocks')
+    .delete()
+    .eq('company_id', companyInfo.id)
+  if (err2) return { error: err2.message }
+
+  // 3. Delete all existing stock categories
+  const { error: err3 } = await supabase
+    .from('stock_categories')
+    .delete()
+    .eq('company_id', companyInfo.id)
+  if (err3) return { error: err3.message }
+
+  // 4. Insert base chart of account categories
+  const baseCategories = [
+    { name: 'İlk Madde ve Malzeme', base_code: '150.01' },
+    { name: 'Yarı Mamuller - Üretim', base_code: '151.01' },
+    { name: 'Mamuller', base_code: '152.01' },
+    { name: 'Ticari Mallar', base_code: '153.01' },
+    { name: 'Diğer Stoklar', base_code: '157.01' }
+  ]
+
+  for (const cat of baseCategories) {
+    const { error: err4 } = await supabase
+      .from('stock_categories')
+      .insert({
+        company_id: companyInfo.id,
+        name: cat.name,
+        base_code: cat.base_code,
+        fields: [],
+        created_by
+      } as any)
+    if (err4) return { error: err4.message }
+  }
+
+  revalidatePath('/stocks')
+  revalidatePath('/')
+  return { success: true }
+}

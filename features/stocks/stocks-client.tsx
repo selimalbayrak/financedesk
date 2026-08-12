@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory } from './actions'
+import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory, initializeUniformChartOfAccounts } from './actions'
 import { toast } from 'sonner'
 import { useHotkeys } from 'react-hotkeys-hook'
 import * as XLSX from 'xlsx'
@@ -87,32 +87,32 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
     if (val === 'new') {
       const name = window.prompt('Yeni Kategori Adı:')
       if (name) {
-        const baseCode = window.prompt('Kategori Başlangıç Kodu (Örn: 2000, ARB-100):')
-        handleCreateCategory(name, baseCode || undefined)
+        const mainCode = window.prompt('Ana Hesap Kodu (Örn: 150, 153):')
+        const subCode = window.prompt('Alt Hesap Kodu (Örn: 01, 02):')
+        const baseCode = mainCode && subCode ? `${mainCode}.${subCode}` : undefined
+        handleCreateCategory(name, baseCode)
       }
     } else {
       setSelectedCatId(val)
       if (!editStock || editStock.category_id !== val) {
         setAttributes({}) // reset attributes on category change
         
-        // Auto-increment stock code
+        // Auto-increment stock code (Tree format: 150.01.001)
         const cat = stockCategories.find(c => c.id === val)
         if (cat?.base_code) {
-          const basePrefix = cat.base_code.replace(/\d+$/, '') // Extract prefix (e.g., "ARB-" from "ARB-100")
-          const catStocks = stocks.filter(s => s.category_id === val && s.code.startsWith(basePrefix))
+          const prefix = cat.base_code + '.'
+          const catStocks = stocks.filter(s => s.category_id === val && s.code.startsWith(prefix))
           
           if (catStocks.length > 0) {
-            let maxNum = parseInt(cat.base_code.match(/\d+$/)?.[0] || '0', 10) - 1
+            let maxNum = 0
             catStocks.forEach(s => {
-              const match = s.code.match(/\d+$/)
-              if (match) {
-                const num = parseInt(match[0], 10)
-                if (num > maxNum) maxNum = num
-              }
+              const match = s.code.substring(prefix.length) // e.g. "005"
+              const num = parseInt(match, 10)
+              if (!isNaN(num) && num > maxNum) maxNum = num
             })
-            setStockCode(basePrefix + (maxNum + 1))
+            setStockCode(prefix + String(maxNum + 1).padStart(3, '0'))
           } else {
-            setStockCode(cat.base_code)
+            setStockCode(prefix + '001')
           }
         }
       }
@@ -236,6 +236,19 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
     exportToExcel()
   }, { enableOnFormTags: false })
 
+  const handleInitAccounts = async () => {
+    if (window.confirm('UYARI: Mevcut tüm stok ve kategoriler silinerek Tekdüzen Hesap Planı başlatılacak. Emin misiniz?')) {
+      setLoading(true)
+      const res = await initializeUniformChartOfAccounts()
+      if (res.error) toast.error(res.error)
+      else {
+        toast.success('Tekdüzen Hesap Planı başarıyla başlatıldı!')
+        window.location.reload()
+      }
+      setLoading(false)
+    }
+  }
+
   const exportToExcel = () => {
     const data = filteredStocks.map(s => ({
       'Stok Kodu': s.code,
@@ -268,6 +281,12 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
           </p>
         </div>
         <div className="flex gap-2">
+          {stockCategories.length === 0 && stocks.length === 0 && (
+            <Button variant="outline" onClick={handleInitAccounts} className="border-red-200 text-red-600 hover:bg-red-50 gap-2 rounded-lg">
+              <RefreshCw className="w-4 h-4" />
+              Tekdüzeni Başlat
+            </Button>
+          )}
           <Button variant="outline" onClick={exportToExcel} title="Excel'e Aktar (Ctrl+E)" className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 rounded-lg">
             <Download className="w-4 h-4" />
             Dışa Aktar
