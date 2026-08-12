@@ -281,13 +281,8 @@ export async function initializeUniformChartOfAccounts() {
   if (err3) return { error: err3.message }
 
   // 4. Insert base chart of account categories
-  const baseCategories = [
-    { name: 'İlk Madde ve Malzeme', base_code: '150.01' },
-    { name: 'Yarı Mamuller - Üretim', base_code: '151.01' },
-    { name: 'Mamuller', base_code: '152.01' },
-    { name: 'Ticari Mallar', base_code: '153.01' },
-    { name: 'Diğer Stoklar', base_code: '157.01' }
-  ]
+  const baseCategories = require("../../accounts.json")
+
 
   for (const cat of baseCategories) {
     const { error: err4 } = await supabase
