@@ -166,7 +166,7 @@ export function NewInvoiceClient({ accounts, stocks }: NewInvoiceClientProps) {
               </div>
               <div className="space-y-2">
                 <Label>{type === 'SALES' ? 'Müşteri' : 'Tedarikçi'}</Label>
-                <Select value={accountId} onValueChange={setAccountId}>
+                <Select value={accountId} onValueChange={(val) => setAccountId(val || '')}>
                   <SelectTrigger className="h-11 rounded-xl bg-muted/50">
                     <SelectValue placeholder="Seçiniz..." />
                   </SelectTrigger>
