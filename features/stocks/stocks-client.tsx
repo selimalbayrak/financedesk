@@ -756,7 +756,7 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
             <form onSubmit={handleCreateCategory} className="p-6 flex flex-col gap-5">
               <div className="space-y-2">
                 <Label>Ana Grup Seçimi *</Label>
-                <Select value={newCatParentId} onValueChange={setNewCatParentId} required>
+                <Select value={newCatParentId} onValueChange={(val) => setNewCatParentId(val || '')} required>
                   <SelectTrigger className="h-10 rounded-xl">
                     <SelectValue placeholder="Örn: 153 Ticari Mallar" />
                   </SelectTrigger>
