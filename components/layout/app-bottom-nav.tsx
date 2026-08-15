@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Users, Plus, Wallet, Briefcase, CreditCard, Package, Building2, FileText } from 'lucide-react'
+import { Home, Users, Plus, Wallet, Briefcase, CreditCard, Package, Building2, FileText, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -114,6 +114,18 @@ export function AppBottomNav() {
           )}
         >
           <Building2 className="w-7 h-7 stroke-[2.5]" />
+        </Link>
+
+        {/* Accounting */}
+        <Link 
+          href="/accounting/trial-balance"
+          title="Muhasebe"
+          className={cn(
+            "flex flex-col items-center gap-1 transition-all duration-300",
+            pathname.startsWith('/accounting') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
+          )}
+        >
+          <BookOpen className="w-7 h-7 stroke-[2.5]" />
         </Link>
 
       </div>

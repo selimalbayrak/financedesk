@@ -230,10 +230,6 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleInitAccounts} className="border-red-200 text-red-600 hover:bg-red-50 gap-2 rounded-lg">
-            <RefreshCw className="w-4 h-4" />
-            Tekdüzeni Başlat (Eski Verileri Siler)
-          </Button>
           <Button variant="outline" onClick={exportToExcel} title="Excel'e Aktar (Ctrl+E)" className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 rounded-lg">
             <Download className="w-4 h-4" />
             Dışa Aktar
