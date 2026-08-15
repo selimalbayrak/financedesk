@@ -100,7 +100,7 @@ export function EmployeeTransactionSheet({
         await processPersonnelTransaction(
           empData.name,
           cleanValues.amount, // Send cents
-          cleanValues.safe_id,
+          cleanValues.safe_id ?? null,
           cleanValues.date,
           cleanValues.description || (type === 'ACCRUAL' ? 'Maaş Hakedişi' : 'Personel Ödemesi'),
           type
