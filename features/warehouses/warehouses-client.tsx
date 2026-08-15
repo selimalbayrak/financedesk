@@ -62,14 +62,20 @@ export function WarehousesClient({ warehouses }: WarehousesClientProps) {
           <h1 className="text-2xl font-bold tracking-tight">Depolar</h1>
           <p className="text-muted-foreground mt-1">Stoklarınızın bulunduğu depoları yönetin.</p>
         </div>
-        <WarehouseFormSheet 
-          open={isFormOpen}
-          onOpenChange={(open) => {
-            setIsFormOpen(open)
-            if (!open) setWarehouseToEdit(null)
-          }}
-          warehouseToEdit={warehouseToEdit}
-        />
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setIsFormOpen(true)} className="rounded-xl shadow-lg shadow-primary/25">
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Depo Ekle
+          </Button>
+          <WarehouseFormSheet 
+            open={isFormOpen}
+            onOpenChange={(open) => {
+              setIsFormOpen(open)
+              if (!open) setWarehouseToEdit(null)
+            }}
+            warehouseToEdit={warehouseToEdit}
+          />
+        </div>
       </div>
 
       {/* Grid */}
@@ -108,7 +114,9 @@ export function WarehousesClient({ warehouses }: WarehousesClientProps) {
               </div>
 
               <div>
-                <h3 className="font-semibold text-lg line-clamp-1" title={warehouse.name}>{warehouse.name}</h3>
+                <h3 className="font-semibold text-lg line-clamp-1" title={warehouse.name}>
+                  {(warehouse as any).chart_of_accounts?.code ? `${(warehouse as any).chart_of_accounts.code} - ` : ''}{warehouse.name}
+                </h3>
                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
                   <MapPin className="w-3.5 h-3.5" />
                   <span className="text-sm">Aktif Depo</span>

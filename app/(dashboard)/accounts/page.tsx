@@ -20,13 +20,27 @@ export default async function AccountsPage() {
 
   const supabase = await createClient()
 
-  const { data: accountsRaw } = await supabase
-    .from('account_balances')
-    .select('*')
-    .eq('company_id', companyInfo.id)
-    .order('name', { ascending: true })
+  const [
+    { data: accountsRaw },
+    { data: chartOfAccounts }
+  ] = await Promise.all([
+    supabase
+      .from('account_balances')
+      .select('*')
+      .eq('company_id', companyInfo.id)
+      .order('name', { ascending: true }),
+    supabase
+      .from('chart_of_accounts')
+      .select('id, code')
+      .eq('company_id', companyInfo.id)
+  ])
 
-  const accounts = accountsRaw ?? []
+  const coaMap = new Map((chartOfAccounts || []).map(c => [c.id, c.code]))
+
+  const accounts = (accountsRaw ?? []).map(acc => ({
+    ...acc,
+    account_code: acc.chart_of_account_id ? coaMap.get(acc.chart_of_account_id) || null : null
+  }))
 
   return <AccountsTable accounts={accounts as any} companyId={companyInfo.id} />
 }

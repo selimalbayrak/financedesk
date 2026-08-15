@@ -253,7 +253,7 @@ export function ImportForm({ accounts, safes }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     {safes.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                     ))}
                     {safes.length === 0 && <SelectItem value="none" disabled>Kasa bulunamadı</SelectItem>}
                   </SelectContent>
@@ -374,7 +374,7 @@ export function ImportForm({ accounts, safes }: Props) {
                       </SelectTrigger>
                       <SelectContent>
                         {safes.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -461,7 +461,7 @@ export function ImportForm({ accounts, safes }: Props) {
                               </SelectTrigger>
                               <SelectContent>
                                 {safes.map(s => (
-                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                  <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>

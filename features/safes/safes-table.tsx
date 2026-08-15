@@ -106,7 +106,9 @@ export function SafesTable({ data }: SafesTableProps) {
                   <div className="p-2 bg-primary/10 rounded-xl text-primary">
                     <Wallet className="w-4 h-4" />
                   </div>
-                  {safe.name}
+                  <div>
+                    <span>{(safe as any).account_code ? `${(safe as any).account_code} - ` : ''}{(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name}</span>
+                  </div>
                 </TableCell>
                 <TableCell className="text-right text-emerald-600 dark:text-emerald-400 tabular-nums">
                   +{Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(safe.total_in / 100)}

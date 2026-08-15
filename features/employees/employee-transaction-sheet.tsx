@@ -165,7 +165,7 @@ export function EmployeeTransactionSheet({
                       <SelectContent>
                         {safes.map(safe => (
                           <SelectItem key={safe.id} value={safe.id}>
-                            {safe.name}
+                            {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

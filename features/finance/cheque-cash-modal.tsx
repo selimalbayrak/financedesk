@@ -232,7 +232,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                 </SelectTrigger>
                 <SelectContent className="bg-card border">
                   {safes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -270,7 +270,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                     </SelectTrigger>
                     <SelectContent className="bg-card border">
                       {safes.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -450,7 +450,7 @@ export function ChequeCashModal({ isOpen, onClose, cheque, safes, accounts }: Ch
                       </SelectTrigger>
                       <SelectContent className="bg-card border">
                         {safes.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

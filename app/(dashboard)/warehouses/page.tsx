@@ -13,7 +13,7 @@ export default async function WarehousesPage() {
 
   const { data: warehouses } = await supabase
     .from('warehouses')
-    .select('*')
+    .select('*, chart_of_accounts(code)')
     .eq('company_id', companyInfo.id)
     .eq('is_active', true)
     .order('name')

@@ -823,7 +823,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                                           </div>
                                           {safes.map(safe => (
                                             <DropdownMenuItem key={safe.id} onClick={() => handlePay(inst.id, safe.id)} className="cursor-pointer">
-                                              {safe.name} ile Öde
+                                              {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name} ile Öde
                                             </DropdownMenuItem>
                                           ))}
                                         </DropdownMenuContent>
@@ -982,7 +982,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                                               <DropdownMenuSubContent className="bg-card border">
                                                 {safes.map(safe => (
                                                   <DropdownMenuItem key={safe.id} onClick={() => handlePayExpenseRecurring(exp.id, safe.id, months)} className="cursor-pointer">
-                                                    {safe.name} ile Öde
+                                                    {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name} ile Öde
                                                   </DropdownMenuItem>
                                                 ))}
                                               </DropdownMenuSubContent>
@@ -1004,7 +1004,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                                         </div>
                                         {safes.map(safe => (
                                           <DropdownMenuItem key={safe.id} onClick={() => handlePayExpense(exp.id, safe.id)} className="cursor-pointer">
-                                            {safe.name} ile Öde
+                                            {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name} ile Öde
                                           </DropdownMenuItem>
                                         ))}
                                       </DropdownMenuContent>
@@ -1733,7 +1733,7 @@ export function FinanceClient({ cheques, loans, installments, safes, accounts, e
                   </SelectTrigger>
                   <SelectContent className="bg-card border">
                     {safes.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

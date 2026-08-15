@@ -88,7 +88,7 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
             href={`/accounts/${row.original.id}`}
             className="font-medium hover:text-primary transition-colors"
           >
-            {row.original.company_name || row.original.name}
+            {(row.original as any).account_code ? `${(row.original as any).account_code} - ` : ''}{row.original.company_name || row.original.name}
           </Link>
           {row.original.company_name && (
             <p className="text-xs text-muted-foreground">{row.original.name}</p>

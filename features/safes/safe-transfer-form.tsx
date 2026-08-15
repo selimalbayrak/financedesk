@@ -117,7 +117,7 @@ export function SafeTransferForm({ safes }: SafeTransferFormProps) {
                 <SelectContent className="rounded-xl">
                   {safes.map(safe => (
                     <SelectItem key={safe.id} value={safe.id} className="rounded-lg">
-                      {safe.name} (Bakiye: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(safe.balance)})
+                      {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name} (Bakiye: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(safe.balance)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -133,7 +133,7 @@ export function SafeTransferForm({ safes }: SafeTransferFormProps) {
                 <SelectContent className="rounded-xl">
                   {safes.map(safe => (
                     <SelectItem key={safe.id} value={safe.id} className="rounded-lg">
-                      {safe.name}
+                      {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

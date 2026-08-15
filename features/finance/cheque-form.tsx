@@ -309,7 +309,7 @@ export function ChequeForm({ accounts, safes }: { accounts: Account[], safes: Sa
                     </SelectTrigger>
                     <SelectContent className="bg-card border">
                       {safes.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -449,7 +449,7 @@ export function ChequeForm({ accounts, safes }: { accounts: Account[], safes: Sa
                         </SelectTrigger>
                         <SelectContent className="bg-card border">
                           {safes.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

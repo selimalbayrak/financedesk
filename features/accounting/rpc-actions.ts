@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getActiveCompany } from '@/lib/company'
 
 export async function processExpensePayment(
   expenseType: string,
@@ -10,21 +11,13 @@ export async function processExpensePayment(
   date: string,
   description: string
 ) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { success: false, error: 'Şirket bulunamadı.' }
+
   const supabase = await createClient()
-  
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError || !userData?.user) return { success: false, error: 'Kullanıcı bulunamadı.' }
-  
-  const { data: companyUser, error: companyUserError } = await supabase
-    .from('company_users')
-    .select('company_id')
-    .eq('user_id', userData.user.id)
-    .single()
-    
-  if (companyUserError || !companyUser) return { success: false, error: 'Şirket bulunamadı.' }
 
   const { error } = await supabase.rpc('process_expense_payment', {
-    p_company_id: companyUser.company_id,
+    p_company_id: companyInfo.id,
     p_expense_type: expenseType,
     p_amount: amount,
     p_safe_bank_account_id: safeBankAccountId,
@@ -50,21 +43,13 @@ export async function processPersonnelTransaction(
   description: string,
   type: 'ACCRUAL' | 'PAYMENT'
 ) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { success: false, error: 'Şirket bulunamadı.' }
+
   const supabase = await createClient()
-  
-  const { data: userData } = await supabase.auth.getUser()
-  if (!userData?.user) return { success: false, error: 'Kullanıcı bulunamadı.' }
-  
-  const { data: companyUser } = await supabase
-    .from('company_users')
-    .select('company_id')
-    .eq('user_id', userData.user.id)
-    .single()
-    
-  if (!companyUser) return { success: false, error: 'Şirket bulunamadı.' }
 
   const { error } = await supabase.rpc('process_personnel_transaction', {
-    p_company_id: companyUser.company_id,
+    p_company_id: companyInfo.id,
     p_employee_name: employeeName,
     p_amount: amount,
     p_safe_bank_account_id: safeBankAccountId,
@@ -91,21 +76,13 @@ export async function processCariPayment(
   description: string,
   direction: 'COLLECTION' | 'PAYMENT'
 ) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { success: false, error: 'Şirket bulunamadı.' }
+
   const supabase = await createClient()
-  
-  const { data: userData } = await supabase.auth.getUser()
-  if (!userData?.user) return { success: false, error: 'Kullanıcı bulunamadı.' }
-  
-  const { data: companyUser } = await supabase
-    .from('company_users')
-    .select('company_id')
-    .eq('user_id', userData.user.id)
-    .single()
-    
-  if (!companyUser) return { success: false, error: 'Şirket bulunamadı.' }
 
   const { error } = await supabase.rpc('process_cari_payment', {
-    p_company_id: companyUser.company_id,
+    p_company_id: companyInfo.id,
     p_cari_account_id: cariAccountId,
     p_safe_bank_account_id: safeBankAccountId,
     p_amount: amount,

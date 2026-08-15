@@ -520,7 +520,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
                             </SelectTrigger>
                             <SelectContent className="bg-card border">
                               {safes.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -678,7 +678,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
                             </SelectTrigger>
                             <SelectContent className="bg-card border">
                               {safes.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                <SelectItem key={s.id} value={s.id}>{(s as any).account_code ? `${(s as any).account_code} - ${s.name}` : s.name}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -850,7 +850,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
                   <SelectContent className="bg-card border">
                     {safes.map(safe => (
                       <SelectItem key={safe.id} value={safe.id}>
-                        {safe.name}
+                        {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name}
                       </SelectItem>
                     ))}
                     {safes.length === 0 && (
@@ -870,7 +870,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
                     <SelectContent className="bg-card border">
                       {safes.map(safe => (
                         <SelectItem key={safe.id} value={safe.id}>
-                          {safe.name}
+                          {(safe as any).account_code ? `${(safe as any).account_code} - ${safe.name}` : safe.name}
                         </SelectItem>
                       ))}
                       {safes.length === 0 && (

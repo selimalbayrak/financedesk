@@ -312,6 +312,7 @@ export interface Database {
           positive_total: number
           negative_total: number
           balance: number
+          chart_of_account_id: string | null
         }
       }
       employee_balances: {
@@ -339,6 +340,7 @@ export interface Database {
           total_in: number
           total_out: number
           balance: number
+          chart_of_account_id: string | null
         }
       }
     }
