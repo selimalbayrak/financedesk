@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SafesTable } from '@/features/safes/safes-table'
 import { SafeFormSheet } from '@/features/safes/safe-form-sheet'
+import { SafeTransferForm } from '@/features/safes/safe-transfer-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +28,10 @@ export default async function SafesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Kasalar ve Bankalar</h1>
           <p className="text-muted-foreground">Şirket içi nakit ve banka hesaplarınızı yönetin.</p>
         </div>
-        <SafeFormSheet />
+        <div className="flex gap-3">
+          <SafeTransferForm safes={safes ?? []} />
+          <SafeFormSheet />
+        </div>
       </div>
 
       <SafesTable data={safes ?? []} />

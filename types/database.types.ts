@@ -29,6 +29,7 @@ export interface Database {
           updated_at: string
           created_by: string | null
           deleted_at: string | null
+          chart_of_account_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['accounts']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['accounts']['Insert']>
@@ -91,6 +92,7 @@ export interface Database {
           created_at: string
           updated_at: string
           deleted_at: string | null
+          chart_of_account_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['safes']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['safes']['Insert']>
@@ -179,6 +181,7 @@ export interface Database {
           created_at: string
           updated_at: string
           deleted_at: string | null
+          chart_of_account_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['loans']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['loans']['Insert']>
@@ -200,19 +203,95 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['loan_installments']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['loan_installments']['Insert']>
       }
-      stock_categories: {
+      chart_of_accounts: {
+        Row: {
+          id: string
+          company_id: string
+          code: string
+          name: string
+          type: 'MAIN' | 'SUB' | 'DETAIL'
+          parent_id: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['chart_of_accounts']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['chart_of_accounts']['Insert']>
+      }
+      warehouses: {
         Row: {
           id: string
           company_id: string
           name: string
-          base_code: string | null
-          fields: { name: string; type: string }[]
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['warehouses']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['warehouses']['Insert']>
+      }
+      journal_entries: {
+        Row: {
+          id: string
+          company_id: string
+          date: string
+          description: string
+          receipt_no: string | null
+          type: 'PURCHASE_INVOICE' | 'SALES_INVOICE' | 'PAYMENT' | 'COLLECTION' | 'TRANSFER' | 'MANUAL'
           created_at: string
           created_by: string | null
-          updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['stock_categories']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['stock_categories']['Insert']>
+        Insert: Omit<Database['public']['Tables']['journal_entries']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['journal_entries']['Insert']>
+      }
+      journal_entry_lines: {
+        Row: {
+          id: string
+          journal_entry_id: string
+          chart_of_account_id: string
+          debit: number
+          credit: number
+        }
+        Insert: Omit<Database['public']['Tables']['journal_entry_lines']['Row'], 'id'>
+        Update: Partial<Database['public']['Tables']['journal_entry_lines']['Insert']>
+      }
+      invoices: {
+        Row: {
+          id: string
+          company_id: string
+          account_id: string
+          type: 'PURCHASE' | 'SALES'
+          invoice_number: string
+          issue_date: string
+          due_date: string | null
+          ettn: string | null
+          tax_number: string | null
+          tax_office: string | null
+          total_amount: number
+          tax_amount: number
+          grand_total: number
+          status: 'DRAFT' | 'APPROVED' | 'CANCELLED'
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['invoices']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['invoices']['Insert']>
+      }
+      invoice_items: {
+        Row: {
+          id: string
+          invoice_id: string
+          stock_id: string
+          quantity: number
+          unit_price: number
+          tax_rate: number
+          total: number
+        }
+        Insert: Omit<Database['public']['Tables']['invoice_items']['Row'], 'id'>
+        Update: Partial<Database['public']['Tables']['invoice_items']['Insert']>
       }
     }
     Views: {
@@ -293,6 +372,14 @@ export type TransactionLine = Database['public']['Tables']['transaction_lines'][
 export type TransactionLineInsert = Database['public']['Tables']['transaction_lines']['Insert']
 export type TransactionLineUpdate = Database['public']['Tables']['transaction_lines']['Update']
 
+export type ChartOfAccount = Database['public']['Tables']['chart_of_accounts']['Row']
+export type ChartOfAccountInsert = Database['public']['Tables']['chart_of_accounts']['Insert']
+export type ChartOfAccountUpdate = Database['public']['Tables']['chart_of_accounts']['Update']
+
+export type Warehouse = Database['public']['Tables']['warehouses']['Row']
+export type WarehouseInsert = Database['public']['Tables']['warehouses']['Insert']
+export type WarehouseUpdate = Database['public']['Tables']['warehouses']['Update']
+
 export type AccountBalance = Database['public']['Views']['account_balances']['Row']
 export type SafeBalance = Database['public']['Views']['safe_balances']['Row']
 export type EmployeeBalance = Database['public']['Views']['employee_balances']['Row']
@@ -322,8 +409,8 @@ export type Stock = {
   company_id: string
   code: string
   name: string
-  category_id: string | null
-  category?: string | null
+  chart_of_account_id: string | null
+  chart_of_account?: string | null
   attributes?: Record<string, any>
   unit: string | null
   unit_price: number
@@ -333,7 +420,7 @@ export type Stock = {
   created_by: string | null
   created_at: string
   updated_at: string
-  stock_categories?: StockCategory | null
+  chart_of_accounts?: ChartOfAccount | null
 }
 
 export type StockMovement = {
@@ -342,7 +429,10 @@ export type StockMovement = {
   stock_id: string
   account_id: string | null
   transaction_id: string | null
-  movement_type: 'in' | 'out'
+  movement_type: 'in' | 'out' | 'transfer'
+  source_warehouse_id: string | null
+  destination_warehouse_id: string | null
+  account_code: string | null
   quantity: number
   unit_price: number
   total_amount: number
@@ -353,3 +443,8 @@ export type StockMovement = {
   stock?: Stock
   account?: Account
 }
+
+export type JournalEntry = Database['public']['Tables']['journal_entries']['Row']
+export type JournalEntryLine = Database['public']['Tables']['journal_entry_lines']['Row']
+export type Invoice = Database['public']['Tables']['invoices']['Row']
+export type InvoiceItem = Database['public']['Tables']['invoice_items']['Row']

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Users, Plus, Wallet, Briefcase, CreditCard, Package } from 'lucide-react'
+import { Home, Users, Plus, Wallet, Briefcase, CreditCard, Package, Building2, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -33,6 +33,18 @@ export function AppBottomNav() {
           )}
         >
           <Briefcase className="w-7 h-7 stroke-[2.5]" />
+        </Link>
+
+        {/* Invoices */}
+        <Link 
+          href="/invoices"
+          title="Faturalar"
+          className={cn(
+            "flex flex-col items-center gap-1 transition-all duration-300",
+            pathname.startsWith('/invoices') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
+          )}
+        >
+          <FileText className="w-7 h-7 stroke-[2.5]" />
         </Link>
 
         {/* Finance (Loans & Cheques) */}
@@ -90,6 +102,18 @@ export function AppBottomNav() {
           )}
         >
           <Package className="w-7 h-7 stroke-[2.5]" />
+        </Link>
+
+        {/* Warehouses */}
+        <Link 
+          href="/warehouses"
+          title="Depolar"
+          className={cn(
+            "flex flex-col items-center gap-1 transition-all duration-300",
+            pathname.startsWith('/warehouses') ? "text-primary scale-110" : "text-muted-foreground hover:text-primary hover:scale-105"
+          )}
+        >
+          <Building2 className="w-7 h-7 stroke-[2.5]" />
         </Link>
 
       </div>

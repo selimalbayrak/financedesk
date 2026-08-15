@@ -21,11 +21,12 @@ export default async function StocksPage() {
     { data: stocks },
     { data: movements },
     { data: accounts },
-    { data: stockCategories }
+    { data: chartOfAccounts },
+    { data: warehouses }
   ] = await Promise.all([
     supabase
       .from('stocks')
-      .select('*, stock_categories(*)')
+      .select('*, chart_of_accounts(*)')
       .eq('company_id', companyInfo.id)
       .order('code'),
     supabase
@@ -40,9 +41,17 @@ export default async function StocksPage() {
       .is('deleted_at', null)
       .order('name'),
     supabase
-      .from('stock_categories')
+      .from('chart_of_accounts')
       .select('*')
       .eq('company_id', companyInfo.id)
+      .like('code', '15%')
+      .neq('type', 'MAIN')
+      .order('code'),
+    supabase
+      .from('warehouses')
+      .select('*')
+      .eq('company_id', companyInfo.id)
+      .eq('is_active', true)
       .order('name')
   ])
 
@@ -53,7 +62,8 @@ export default async function StocksPage() {
       stocks={stocks ?? []}
       movements={movements ?? []}
       accounts={accounts ?? []}
-      stockCategories={stockCategories ?? []}
+      chartOfAccounts={chartOfAccounts ?? []}
+      warehouses={warehouses ?? []}
     />
   )
 }

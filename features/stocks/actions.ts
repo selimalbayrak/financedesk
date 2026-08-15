@@ -10,11 +10,14 @@ export async function getStockCategories() {
 
   const supabase = await createClient()
 
+  // Sadece 15 ile başlayan ve MAIN olmayan (SUB veya DETAIL) hesapları getir
   const { data, error } = await supabase
-    .from('stock_categories')
+    .from('chart_of_accounts')
     .select('*')
     .eq('company_id', companyInfo.id)
-    .order('name')
+    .like('code', '15%')
+    .neq('type', 'MAIN')
+    .order('code')
 
   if (error) return { error: error.message }
   return { success: true, data }
@@ -46,9 +49,8 @@ export async function createStockCategory(name: string, fields: { name: string; 
 }
 
 export async function createStock(data: {
-  code: string
   name: string
-  category_id?: string
+  chart_of_account_id: string // This is the parent ID from dropdown
   attributes?: Record<string, any>
   unit?: string
   unit_price: number // in cents
@@ -63,13 +65,48 @@ export async function createStock(data: {
   const { data: authData } = await supabase.auth.getUser()
   const created_by = authData.user?.id || null
 
+  // 1. Get the parent account code
+  const { data: parentAccount, error: parentErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code')
+    .eq('id', data.chart_of_account_id)
+    .single()
+    
+  if (parentErr || !parentAccount) return { error: 'Kategori (Üst Hesap) bulunamadı.' }
+
+  // 2. Generate next code via RPC
+  const { data: newCode, error: rpcErr } = await supabase
+    .rpc('generate_next_account_code', {
+      p_company_id: companyInfo.id,
+      p_parent_code: parentAccount.code
+    })
+
+  if (rpcErr || !newCode) return { error: 'Kod oluşturulamadı: ' + (rpcErr?.message || 'Bilinmeyen hata') }
+
+  // 3. Create the new DETAIL account in chart_of_accounts
+  const { data: newAccount, error: accErr } = await supabase
+    .from('chart_of_accounts')
+    .insert({
+      company_id: companyInfo.id,
+      code: newCode,
+      name: data.name,
+      type: 'DETAIL',
+      parent_id: data.chart_of_account_id,
+      created_by
+    } as any)
+    .select()
+    .single()
+
+  if (accErr) return { error: 'Muhasebe hesabı açılamadı: ' + accErr.message }
+
+  // 4. Create the stock
   const { data: stock, error } = await supabase
     .from('stocks')
     .insert({
       company_id: companyInfo.id,
-      code: data.code,
+      code: newCode,
       name: data.name,
-      category_id: data.category_id || null,
+      chart_of_account_id: newAccount.id,
       attributes: data.attributes || {},
       unit: data.unit || 'Adet',
       unit_price: data.unit_price,
@@ -103,9 +140,8 @@ export async function createStock(data: {
 }
 
 export async function updateStock(id: string, data: {
-  code: string
   name: string
-  category_id?: string
+  chart_of_account_id?: string
   attributes?: Record<string, any>
   unit?: string
   unit_price: number
@@ -118,12 +154,11 @@ export async function updateStock(id: string, data: {
 
   const supabase = await createClient()
 
+  // Sadece ad, fiyat, miktar vb güncellenebilir. Hesap planı değişirse yeni kod üretilmeli (şimdilik desteklemiyoruz)
   const { error } = await supabase
     .from('stocks')
     .update({
-      code: data.code,
       name: data.name,
-      category_id: data.category_id || null,
       attributes: data.attributes || {},
       unit: data.unit || 'Adet',
       unit_price: data.unit_price,
@@ -273,31 +308,104 @@ export async function initializeUniformChartOfAccounts() {
     .eq('company_id', companyInfo.id)
   if (err2) return { error: err2.message }
 
-  // 3. Delete all existing stock categories
+  // 3. Delete all chart of accounts (foreign keys in accounts, safes, loans will be set to NULL)
   const { error: err3 } = await supabase
-    .from('stock_categories')
+    .from('chart_of_accounts')
     .delete()
     .eq('company_id', companyInfo.id)
   if (err3) return { error: err3.message }
 
-  // 4. Insert base chart of account categories
-  const baseCategories = require("../../accounts.json")
+  // 4. Insert base chart of accounts hierarchically
+  const { DEFAULT_CHART_OF_ACCOUNTS } = require('@/lib/constants/chart-of-accounts')
+  
+  const mainAccounts = DEFAULT_CHART_OF_ACCOUNTS.filter((a: any) => a.type === 'MAIN' && !a.parentCode)
+  const groupAccounts = DEFAULT_CHART_OF_ACCOUNTS.filter((a: any) => a.type === 'MAIN' && a.parentCode)
+  const subAccounts = DEFAULT_CHART_OF_ACCOUNTS.filter((a: any) => a.type === 'SUB')
 
+  const idMap = new Map<string, string>()
 
-  for (const cat of baseCategories) {
-    const { error: err4 } = await supabase
-      .from('stock_categories')
-      .insert({
+  // Class (1 digit)
+  if (mainAccounts.length > 0) {
+    const { data: insertedMains, error: mainErr } = await supabase
+      .from('chart_of_accounts')
+      .insert(mainAccounts.map((a: any) => ({
         company_id: companyInfo.id,
-        name: cat.name,
-        base_code: cat.base_code,
-        fields: [],
+        code: a.code,
+        name: a.name,
+        type: 'MAIN',
         created_by
-      } as any)
-    if (err4) return { error: err4.message }
+      })))
+      .select()
+    if (mainErr) return { error: mainErr.message }
+    insertedMains?.forEach(m => idMap.set(m.code, m.id))
+  }
+
+  // Group (2 digits)
+  if (groupAccounts.length > 0) {
+    const { data: insertedGroups, error: groupErr } = await supabase
+      .from('chart_of_accounts')
+      .insert(groupAccounts.map((a: any) => ({
+        company_id: companyInfo.id,
+        code: a.code,
+        name: a.name,
+        type: 'MAIN',
+        parent_id: a.parentCode ? idMap.get(a.parentCode) : null,
+        created_by
+      })))
+      .select()
+    if (groupErr) return { error: groupErr.message }
+    insertedGroups?.forEach(g => idMap.set(g.code, g.id))
+  }
+
+  // Account (3 digits)
+  if (subAccounts.length > 0) {
+    const { error: subErr } = await supabase
+      .from('chart_of_accounts')
+      .insert(subAccounts.map((a: any) => ({
+        company_id: companyInfo.id,
+        code: a.code,
+        name: a.name,
+        type: 'SUB',
+        parent_id: a.parentCode ? idMap.get(a.parentCode) : null,
+        created_by
+      })))
+    if (subErr) return { error: subErr.message }
   }
 
   revalidatePath('/stocks')
+  revalidatePath('/accounts')
+  revalidatePath('/safes')
+  revalidatePath('/finance')
   revalidatePath('/')
   return { success: true }
+}
+
+export async function transferStock(data: {
+  stock_id: string
+  source_warehouse_id: string
+  destination_warehouse_id: string
+  quantity: number
+  notes?: string
+}) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) throw new Error('Company not found')
+
+  const supabase = await createClient()
+  const { data: authData } = await supabase.auth.getUser()
+
+  const { error } = await supabase.rpc('transfer_stock', {
+    p_company_id: companyInfo.id,
+    p_stock_id: data.stock_id,
+    p_source_warehouse_id: data.source_warehouse_id,
+    p_destination_warehouse_id: data.destination_warehouse_id,
+    p_quantity: data.quantity,
+    p_notes: data.notes || '',
+    p_created_by: authData.user?.id || null
+  })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/stocks')
 }

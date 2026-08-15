@@ -34,6 +34,7 @@ import { Loader2 } from 'lucide-react'
 import { accountSchema, type AccountFormValues } from '@/lib/validations'
 import { createClient } from '@/lib/supabase/client'
 import type { Account } from '@/types/database.types'
+import { toast } from 'sonner'
 
 interface AccountFormSheetProps {
   open: boolean
@@ -71,19 +72,65 @@ export function AccountFormSheet({ open, onOpenChange, account, companyId }: Acc
 
     startTransition(async () => {
       const db = supabase
-      if (isEditing && account) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (db as any)
-          .from('accounts')
-          .update({ ...cleanValues, updated_at: new Date().toISOString() })
-          .eq('id', account.id)
-          .eq('company_id', companyId)
-      } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (db as any).from('accounts').insert({ ...cleanValues, company_id: companyId })
+      try {
+        if (isEditing && account) {
+          // Düzenleme
+          await (db as any)
+            .from('accounts')
+            .update({ ...cleanValues, updated_at: new Date().toISOString() })
+            .eq('id', account.id)
+            .eq('company_id', companyId)
+        } else {
+          // Yeni
+          const parentCode = values.type === 'customer' ? '120' : '320'
+          
+          // 1. Generate code
+          const { data: newCode, error: rpcErr } = await db.rpc('generate_next_account_code', {
+            p_company_id: companyId,
+            p_parent_code: parentCode
+          })
+          
+          if (rpcErr || !newCode) throw new Error('Hesap kodu oluşturulamadı.')
+          
+          // 2. Get parent ID
+          const { data: parentAccount, error: parentErr } = await db
+            .from('chart_of_accounts')
+            .select('id')
+            .eq('company_id', companyId)
+            .eq('code', parentCode)
+            .single()
+            
+          if (parentErr || !parentAccount) throw new Error('Ana hesap (120/320) bulunamadı. Lütfen Tekdüzen hesap planını başlatın.')
+          
+          const accountName = values.company_name || values.name
+          
+          // 3. Create chart of account
+          const { data: newChartAcc, error: chartErr } = await db
+            .from('chart_of_accounts')
+            .insert({
+              company_id: companyId,
+              code: newCode,
+              name: accountName,
+              type: 'DETAIL',
+              parent_id: parentAccount.id
+            } as any)
+            .select()
+            .single()
+            
+          if (chartErr) throw new Error('Hesap planı kaydı oluşturulamadı.')
+
+          // 4. Create account
+          await (db as any).from('accounts').insert({ 
+            ...cleanValues, 
+            company_id: companyId,
+            chart_of_account_id: newChartAcc.id
+          })
+        }
+        onOpenChange(false)
+        router.refresh()
+      } catch (err: any) {
+        toast.error(err.message)
       }
-      onOpenChange(false)
-      router.refresh()
     })
   }
 

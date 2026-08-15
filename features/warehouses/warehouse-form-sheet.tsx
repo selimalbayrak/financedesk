@@ -12,48 +12,45 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { createSafe, updateSafe } from './actions'
+import { createWarehouse, updateWarehouse } from './actions'
 import { toast } from 'sonner'
+import type { Warehouse } from '@/types/database.types'
 
-interface SafeFormSheetProps {
+interface WarehouseFormSheetProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  safeToEdit?: { id: string; name: string }
+  warehouseToEdit?: Warehouse | null
 }
 
-export function SafeFormSheet({ open: controlledOpen, onOpenChange: setControlledOpen, safeToEdit }: SafeFormSheetProps) {
+export function WarehouseFormSheet({
+  open: controlledOpen,
+  onOpenChange: setControlledOpen,
+  warehouseToEdit
+}: WarehouseFormSheetProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen
-  const setOpen = setControlledOpen !== undefined ? setControlledOpen : setUncontrolledOpen
+  const setOpen = setControlledOpen || setUncontrolledOpen
 
   const [loading, setLoading] = useState(false)
   const [name, setName] = useState('')
-  const [type, setType] = useState<'kasa' | 'banka'>('kasa')
 
   useEffect(() => {
     if (open) {
-      if (safeToEdit) {
-        setName(safeToEdit.name)
-        setType('kasa')
-      } else {
-        setName('')
-        setType('kasa')
-      }
+      setName(warehouseToEdit?.name || '')
     }
-  }, [open, safeToEdit])
+  }, [open, warehouseToEdit])
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      if (safeToEdit) {
-        await updateSafe(safeToEdit.id, { name })
-        toast.success('Kasa/Banka bilgileri güncellendi!')
+      if (warehouseToEdit) {
+        await updateWarehouse(warehouseToEdit.id, { name })
+        toast.success('Depo bilgileri güncellendi!')
       } else {
-        await createSafe({ name, type })
-        toast.success('Yeni Kasa/Banka eklendi!')
+        await createWarehouse({ name })
+        toast.success('Yeni depo eklendi!')
       }
       setOpen(false)
     } catch (error: any) {
@@ -63,7 +60,7 @@ export function SafeFormSheet({ open: controlledOpen, onOpenChange: setControlle
     }
   }
 
-  const isEdit = !!safeToEdit
+  const isEdit = !!warehouseToEdit
 
   return (
     <>
@@ -73,43 +70,28 @@ export function SafeFormSheet({ open: controlledOpen, onOpenChange: setControlle
           className="gap-2 rounded-2xl shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all"
         >
           <Plus className="w-4 h-4" />
-          Yeni Kasa Ekle
+          Yeni Depo Ekle
         </Button>
       )}
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="sm:max-w-md w-full border-l-0 shadow-2xl">
           <SheetHeader className="mb-6">
-            <SheetTitle className="text-2xl">{isEdit ? 'Kasayı Düzenle' : 'Yeni Kasa / Banka Ekle'}</SheetTitle>
+            <SheetTitle className="text-2xl">{isEdit ? 'Depoyu Düzenle' : 'Yeni Depo Ekle'}</SheetTitle>
             <SheetDescription>
-              {isEdit ? 'Kasa veya banka hesabı adını güncelleyin.' : 'Şirketinizdeki nakit kasanızı veya banka hesabınızı buraya tanımlayın.'}
+              {isEdit ? 'Depo adını güncelleyin.' : 'Şirketinizdeki yeni depoyu tanımlayın.'}
             </SheetDescription>
           </SheetHeader>
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="space-y-4">
-              {!isEdit && (
-                <div className="space-y-2">
-                  <Label>Kasa / Banka Türü *</Label>
-                  <Select value={type} onValueChange={(val: any) => setType(val)}>
-                    <SelectTrigger className="h-12 rounded-xl">
-                      <SelectValue placeholder="Tür Seçin" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card z-[200]">
-                      <SelectItem value="kasa">Nakit Kasa (100 Kasa Hesabı)</SelectItem>
-                      <SelectItem value="banka">Banka Hesabı (102 Bankalar Hesabı)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              
               <div className="space-y-2">
-                <Label htmlFor="name">Kasa/Banka Adı *</Label>
+                <Label htmlFor="name">Depo Adı *</Label>
                 <Input 
                   id="name" 
                   name="name" 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Örn: Merkez Kasa, Garanti BBVA..." 
+                  placeholder="Örn: Merkez Depo, Şube Depo 1..." 
                   required 
                   autoComplete="off"
                   className="h-12 rounded-xl"
@@ -123,13 +105,14 @@ export function SafeFormSheet({ open: controlledOpen, onOpenChange: setControlle
                 variant="outline" 
                 onClick={() => setOpen(false)}
                 className="rounded-xl h-12 px-6"
+                disabled={loading}
               >
                 İptal
               </Button>
               <Button 
                 type="submit" 
+                className="rounded-xl h-12 px-8 shadow-lg shadow-primary/25"
                 disabled={loading}
-                className="rounded-xl h-12 px-8 shadow-md"
               >
                 {loading ? 'Kaydediliyor...' : 'Kaydet'}
               </Button>

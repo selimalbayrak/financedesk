@@ -12,16 +12,18 @@ import { createStock, updateStock, deleteStock, addStockMovement, createStockCat
 import { toast } from 'sonner'
 import { useHotkeys } from 'react-hotkeys-hook'
 import * as XLSX from 'xlsx'
-import type { Stock, StockMovement, Account, StockCategory } from '@/types/database.types'
+import type { Stock, StockMovement, Account, ChartOfAccount, Warehouse } from '@/types/database.types'
+import { StockTransferForm } from './stock-transfer-form'
 
 interface StocksClientProps {
   stocks: Stock[]
   movements: StockMovement[]
   accounts: Account[]
-  stockCategories: StockCategory[]
+  chartOfAccounts: ChartOfAccount[]
+  warehouses: Warehouse[]
 }
 
-export function StocksClient({ stocks, movements, accounts, stockCategories: initialCategories }: StocksClientProps) {
+export function StocksClient({ stocks, movements, accounts, chartOfAccounts: initialAccounts, warehouses }: StocksClientProps) {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [activeTab, setActiveTab] = useState<'items' | 'movements'>('items')
@@ -31,11 +33,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   const [editStock, setEditStock] = useState<Stock | null>(null)
   
   // Category State
-  const [stockCategories, setStockCategories] = useState<StockCategory[]>(initialCategories)
-  const [newCatName, setNewCatName] = useState('')
+  const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>(initialAccounts)
   const [selectedCatId, setSelectedCatId] = useState<string>('')
   const [attributes, setAttributes] = useState<Record<string, any>>({})
-  const [stockCode, setStockCode] = useState<string>('')
 
   // Stock Movement Modal State
   const [showMovementModal, setShowMovementModal] = useState(false)
@@ -52,27 +52,25 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   // Set trackMinStock when editing
   useEffect(() => {
     if (editStock) {
-      setStockCode(editStock.code)
       if (Number(editStock.min_stock_level) > 0) {
         setTrackMinStock(true)
       } else {
         setTrackMinStock(false)
       }
     } else {
-      setStockCode('')
       setTrackMinStock(false)
     }
   }, [editStock])
 
   // Unique categories for filter
-  const catFilterOptions = stockCategories.map(c => ({ id: c.id, name: c.name }))
+  const catFilterOptions = chartOfAccounts.map(c => ({ id: c.id, name: c.code + ' - ' + c.name }))
 
   // Filtered stocks
   const filteredStocks = stocks.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) || 
                           s.code.toLowerCase().includes(search.toLowerCase()) ||
-                          (s.stock_categories?.name?.toLowerCase().includes(search.toLowerCase()))
-    const matchesCat = selectedCategory === 'all' || s.category_id === selectedCategory
+                          (s.chart_of_accounts?.name?.toLowerCase().includes(search.toLowerCase()))
+    const matchesCat = selectedCategory === 'all' || s.chart_of_account_id === selectedCategory
     return matchesSearch && matchesCat
   })
 
@@ -85,43 +83,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
   const handleCategoryChange = (val: string | null) => {
     if (!val) return
     setSelectedCatId(val)
-    if (!editStock || editStock.category_id !== val) {
+    if (!editStock || editStock.chart_of_account_id !== val) {
       setAttributes({}) // reset attributes on category change
-      
-      // Auto-increment stock code (Tree format: 150.01.001)
-        const cat = stockCategories.find(c => c.id === val)
-        if (cat?.base_code) {
-          const prefix = cat.base_code + '.'
-          const catStocks = stocks.filter(s => s.category_id === val && s.code.startsWith(prefix))
-          
-          if (catStocks.length > 0) {
-            let maxNum = 0
-            catStocks.forEach(s => {
-              const match = s.code.substring(prefix.length) // e.g. "005"
-              const num = parseInt(match, 10)
-              if (!isNaN(num) && num > maxNum) maxNum = num
-            })
-            setStockCode(prefix + String(maxNum + 1).padStart(3, '0'))
-          } else {
-            setStockCode(prefix + '001')
-          }
-        }
-      }
     }
-  const handleCreateCategory = async (name: string, baseCode?: string) => {
-    setLoading(true)
-    const res = await createStockCategory(name, [], baseCode) // Empty fields for generic new category
-    if (res.error) {
-      toast.error(res.error)
-    } else if (res.data) {
-      toast.success('Kategori eklendi!')
-      setStockCategories([...stockCategories, res.data])
-      setSelectedCatId(res.data.id)
-      if (res.data.base_code) {
-        setStockCode(res.data.base_code)
-      }
-    }
-    setLoading(false)
   }
 
   // Handle Add/Edit Stock Submit
@@ -130,12 +94,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
     setLoading(true)
     const formData = new FormData(e.currentTarget)
     
-    // Auto-save any new category fields entered that weren't in the DB?
-    // Skip for now, rely on `attributes` object populated by inputs.
     const data = {
-      code: formData.get('code') as string,
       name: formData.get('name') as string,
-      category_id: selectedCatId || undefined,
+      chart_of_account_id: selectedCatId,
       attributes: attributes,
       unit: formData.get('unit') as string || 'Adet',
       unit_price: Math.round(parseFloat(formData.get('unit_price') as string || '0') * 100),
@@ -208,7 +169,6 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
 
   const handleOpenAddModal = () => {
     setEditStock(null)
-    setStockCode('')
     setSelectedCatId('')
     setAttributes({})
     setShowAddModal(true)
@@ -242,7 +202,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
     const data = filteredStocks.map(s => ({
       'Stok Kodu': s.code,
       'Stok Adı': s.name,
-      'Kategori': s.category || '',
+      'Kategori': s.chart_of_accounts?.name || '',
       'Birim': s.unit || '',
       'Birim Fiyatı': s.unit_price / 100,
       'Miktar': s.quantity_on_hand,
@@ -278,6 +238,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
             <Download className="w-4 h-4" />
             Dışa Aktar
           </Button>
+          <StockTransferForm stocks={stocks} warehouses={warehouses} />
           <Button onClick={handleOpenAddModal} title="Yeni Stok Ekle (Ctrl+N)" className="rounded-xl shadow-md gap-2 cursor-pointer">
             <Plus className="w-4 h-4" />
             Yeni Stok Ekle
@@ -420,9 +381,9 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs">
-                            {stock.stock_categories?.name ? (
+                            {stock.chart_of_accounts?.name ? (
                               <span className="bg-muted px-2 py-0.5 rounded-md font-medium">
-                                {stock.stock_categories.name}
+                                {stock.chart_of_accounts.name}
                               </span>
                             ) : '—'}
                           </td>
@@ -467,7 +428,7 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                                 className="h-8 w-8 rounded-lg cursor-pointer text-muted-foreground hover:text-primary"
                                 onClick={() => {
                                   setEditStock(stock)
-                                  setSelectedCatId(stock.category_id || '')
+                                  setSelectedCatId(stock.chart_of_account_id || '')
                                   setAttributes(stock.attributes || {})
                                   setShowAddModal(true)
                                 }}
@@ -585,8 +546,17 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
             <div className="space-y-3 text-xs overflow-y-auto pr-2 pb-2 -mr-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="code">Stok Kodu *</Label>
-                  <Input id="code" name="code" value={stockCode} onChange={(e) => setStockCode(e.target.value)} required className="h-9 rounded-lg" />
+                  <Label htmlFor="category">Üst Kategori Seçimi *</Label>
+                  <Select value={selectedCatId || undefined} onValueChange={handleCategoryChange} required>
+                    <SelectTrigger className="h-9 rounded-lg truncate w-full">
+                      <SelectValue placeholder="Hesap Seçin" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border z-[200] max-w-[250px]">
+                      {chartOfAccounts.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id} className="truncate">{cat.code} - {cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="unit">Birim</Label>
@@ -614,47 +584,14 @@ export function StocksClient({ stocks, movements, accounts, stockCategories: ini
                 <Input id="name" name="name" defaultValue={editStock?.name || ''} placeholder="Örn: 20x20 Profil Boru" required className="h-9 rounded-lg" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="category">Kategori</Label>
-                  <Select value={selectedCatId || undefined} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="h-9 rounded-lg truncate w-full">
-                      <SelectValue placeholder="Kategori Seç" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border z-[200] max-w-[200px]">
-                      {stockCategories.map(cat => (
-                        <SelectItem key={cat.id} value={cat.id} className="truncate">{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="unit_price">Birim Fiyat (TL)</Label>
                   <Input id="unit_price" name="unit_price" type="number" step="0.01" defaultValue={editStock ? (editStock.unit_price / 100) : ''} placeholder="0.00" className="h-9 rounded-lg" />
                 </div>
               </div>
 
-              {selectedCatId && stockCategories.find(c => c.id === selectedCatId)?.fields?.length ? (
-                <div className="p-3 bg-muted/30 border rounded-xl space-y-3 mt-2">
-                  <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <Package className="w-3 h-3" />
-                    Kategori Özellikleri
-                  </Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {stockCategories.find(c => c.id === selectedCatId)?.fields.map(field => (
-                      <div key={field.name} className="space-y-1">
-                        <Label className="truncate">{field.name}</Label>
-                        <Input 
-                          type={field.type === 'number' ? 'number' : 'text'}
-                          value={attributes[field.name] || ''}
-                          onChange={e => setAttributes({ ...attributes, [field.name]: e.target.value })}
-                          className="h-8 text-xs rounded-lg bg-background" 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+
 
               <div className="space-y-1 mt-2">
                 <Label htmlFor="quantity_on_hand">Mevcut Stok Miktarı</Label>
