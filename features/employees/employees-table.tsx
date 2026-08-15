@@ -250,7 +250,7 @@ export function EmployeesTable({ employees, companyId }: EmployeesTableProps) {
                 const remaining = emp.total_earned - emp.total_paid
                 return (
                   <tr key={emp.id} className="h-10">
-                    <td className="border border-gray-400 px-2 py-1 font-semibold">{emp.name}</td>
+                    <td className="border border-gray-400 px-2 py-1 font-semibold">{(emp as any).chart_of_accounts?.code ? `${(emp as any).chart_of_accounts.code} - ${emp.name}` : emp.name}</td>
                     <td className="border border-gray-400 px-2 py-1 text-gray-700">{emp.role || '—'}</td>
                     <td className="border border-gray-400 px-2 py-1 text-right tabular-nums">
                       {formatCurrency(emp.wage_amount)} ({emp.wage_type === 'monthly' ? 'Aylık' : 'Günlük'})

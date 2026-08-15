@@ -409,3 +409,47 @@ export async function transferStock(data: {
 
   revalidatePath('/stocks')
 }
+
+
+export async function createStockSubAccount(name: string, parent_account_id: string) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Company not found' }
+
+  const supabase = await createClient()
+  const { data: authData } = await supabase.auth.getUser()
+  const created_by = authData.user?.id || null
+
+  const { data: parentAccount, error: parentErr } = await supabase
+    .from('chart_of_accounts')
+    .select('code')
+    .eq('id', parent_account_id)
+    .single()
+    
+  if (parentErr || !parentAccount) return { error: 'Kategori (Üst Hesap) bulunamadı.' }
+
+  const { data: newCode, error: rpcErr } = await supabase
+    .rpc('generate_next_account_code', {
+      p_company_id: companyInfo.id,
+      p_parent_code: parentAccount.code
+    })
+
+  if (rpcErr || !newCode) return { error: 'Kod oluşturulamadı: ' + (rpcErr?.message || 'Bilinmeyen hata') }
+
+  const { data: newAccount, error: accErr } = await supabase
+    .from('chart_of_accounts')
+    .insert({
+      company_id: companyInfo.id,
+      code: newCode,
+      name,
+      type: 'SUB',
+      parent_id: parent_account_id,
+      created_by
+    } as any)
+    .select()
+    .single()
+
+  if (accErr) return { error: 'Alt kategori açılamadı: ' + accErr.message }
+
+  revalidatePath('/stocks')
+  return { success: true, data: newAccount }
+}

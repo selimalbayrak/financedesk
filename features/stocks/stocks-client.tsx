@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory, initializeUniformChartOfAccounts } from './actions'
+import { createStock, updateStock, deleteStock, addStockMovement, createStockCategory, initializeUniformChartOfAccounts, createStockSubAccount } from './actions'
 import { toast } from 'sonner'
 import { useHotkeys } from 'react-hotkeys-hook'
 import * as XLSX from 'xlsx'
@@ -35,6 +35,10 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
   // Category State
   const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>(initialAccounts)
   const [selectedCatId, setSelectedCatId] = useState<string>('')
+  const [showNewCatModal, setShowNewCatModal] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatParentId, setNewCatParentId] = useState('')
+  const [catLoading, setCatLoading] = useState(false)
   const [attributes, setAttributes] = useState<Record<string, any>>({})
 
   // Stock Movement Modal State
@@ -47,6 +51,29 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
   const [movementNotes, setMovementNotes] = useState('')
 
   const [loading, setLoading] = useState(false)
+
+  async function handleCreateCategory(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newCatName || !newCatParentId) return
+    setCatLoading(true)
+    try {
+      const res = await createStockSubAccount(newCatName, newCatParentId)
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Kategori başarıyla oluşturuldu!')
+        setChartOfAccounts([...chartOfAccounts, res.data])
+        setSelectedCatId(res.data.id)
+        setShowNewCatModal(false)
+        setNewCatName('')
+        setNewCatParentId('')
+      }
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setCatLoading(false)
+    }
+  }
   const [trackMinStock, setTrackMinStock] = useState(false)
 
   // Set trackMinStock when editing
@@ -542,7 +569,12 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
             <div className="space-y-3 text-xs overflow-y-auto pr-2 pb-2 -mr-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="category">Üst Kategori Seçimi *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="category">Üst Kategori Seçimi *</Label>
+                    <button type="button" onClick={() => setShowNewCatModal(true)} className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+                      <Plus className="w-3 h-3" /> Yeni Kategori Ekle
+                    </button>
+                  </div>
                   <Select value={selectedCatId || undefined} onValueChange={handleCategoryChange} required>
                     <SelectTrigger className="h-9 rounded-lg truncate w-full">
                       <SelectValue placeholder="Hesap Seçin" />
@@ -704,6 +736,58 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
               </Button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* New Category Modal */}
+      {showNewCatModal && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-md rounded-3xl shadow-xl border overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold">Yeni Alt Kategori Ekle</h2>
+                <p className="text-sm text-muted-foreground mt-1">Stoklarınız için yeni bir alt hesap grubu oluşturun.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowNewCatModal(false)} className="rounded-full">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={handleCreateCategory} className="p-6 flex flex-col gap-5">
+              <div className="space-y-2">
+                <Label>Ana Grup Seçimi *</Label>
+                <Select value={newCatParentId} onValueChange={setNewCatParentId} required>
+                  <SelectTrigger className="h-10 rounded-xl">
+                    <SelectValue placeholder="Örn: 153 Ticari Mallar" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[250]">
+                    {chartOfAccounts.filter(a => a.type === 'SUB').map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.code} - {cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Kategori Adı *</Label>
+                <Input 
+                  value={newCatName} 
+                  onChange={e => setNewCatName(e.target.value)} 
+                  placeholder="Örn: Gıda Ürünleri" 
+                  required 
+                  className="h-10 rounded-xl"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button type="button" variant="outline" onClick={() => setShowNewCatModal(false)} className="rounded-xl h-10 px-5" disabled={catLoading}>İptal</Button>
+                <Button type="submit" className="rounded-xl h-10 px-6 shadow-lg shadow-primary/25" disabled={catLoading}>
+                  {catLoading ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

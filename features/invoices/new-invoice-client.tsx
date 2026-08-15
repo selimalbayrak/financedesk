@@ -173,7 +173,7 @@ export function NewInvoiceClient({ accounts, stocks }: NewInvoiceClientProps) {
                   <SelectContent className="rounded-xl max-h-64">
                     {filteredAccounts.map(a => (
                       <SelectItem key={a.id} value={a.id} className="rounded-lg">
-                        {a.name}
+                        {(a as any).chart_of_accounts?.code ? `${(a as any).chart_of_accounts.code} - ${a.name}` : a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
