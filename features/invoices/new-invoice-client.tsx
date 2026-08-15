@@ -295,7 +295,7 @@ export function NewInvoiceClient({ accounts, stocks }: NewInvoiceClientProps) {
                         />
                       </td>
                       <td className="p-3">
-                        <Select value={item.tax_rate.toString()} onValueChange={(val) => handleItemChange(index, 'tax_rate', parseFloat(val))}>
+                        <Select value={item.tax_rate.toString()} onValueChange={(val) => handleItemChange(index, 'tax_rate', parseFloat(val || '0'))}>
                           <SelectTrigger className="h-10 rounded-lg">
                             <SelectValue />
                           </SelectTrigger>
