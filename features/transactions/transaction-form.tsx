@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MoneyInput } from '@/components/ui/money-input'
 import { createTransaction, createEmployeeTransaction, createStockReceipt } from './actions'
+import { processExpensePayment } from '@/features/accounting/rpc-actions'
 import { createChequeNote } from '@/features/finance/actions'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
@@ -23,6 +24,7 @@ type Account = {
 const TRANSACTION_TYPES = [
   { id: 'payment_out', label: 'Gönderilen Ödeme', icon: ArrowUpCircle, color: 'text-rose-500' },
   { id: 'payment_in', label: 'Alınan Ödeme', icon: ArrowDownCircle, color: 'text-emerald-500' },
+  { id: 'expense', label: 'Yeni Gider Ekle', icon: ArrowUpCircle, color: 'text-orange-500' },
   { id: 'invoice_out', label: 'Fatura Kestik (Verilen)', icon: PackageMinus, color: 'text-emerald-500' },
   { id: 'invoice_in', label: 'Fatura Geldi (Alınan)', icon: PackagePlus, color: 'text-rose-500' },
   { id: 'safe_transfer', label: 'Kasalar Arası Transfer', icon: ArrowRightLeft, color: 'text-blue-500' },
@@ -48,6 +50,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
   const [stockId, setStockId] = useState<string>('')
   const [stockQuantity, setStockQuantity] = useState<string>('1')
   const [stockMovementType, setStockMovementType] = useState<'in' | 'out'>('in')
+  const [expenseType, setExpenseType] = useState<string>('')
 
   // AI Invoice Upload State
   const [invoiceParsing, setInvoiceParsing] = useState(false)
@@ -273,6 +276,19 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
         })
         toast.success('Stok fişi başarıyla eklendi!')
         router.push('/stocks')
+      } else if (type === 'expense') {
+        const amountStr = formData.get('amount') as string
+        const expenseVal = Math.round(parseFloat(amountStr.replace(',', '.')) * 100)
+        
+        await processExpensePayment(
+          expenseType,
+          expenseVal,
+          formData.get('safe_id') as string,
+          formData.get('transaction_date') as string,
+          formData.get('description') as string
+        )
+        toast.success('Gider başarıyla eklendi!')
+        router.push('/')
       } else {
         const amountStr = formData.get('amount') as string
         const txVal = Math.round(parseFloat(amountStr.replace(',', '.')) * 100)
@@ -717,7 +733,7 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
-              {type !== 'safe_transfer' && type !== 'salary_payment' && (
+              {type !== 'safe_transfer' && type !== 'salary_payment' && type !== 'expense' && (
                 <div className="space-y-2">
                   <Label htmlFor="account_id">Cari Hesap (Kişi/Firma)</Label>
                   <Select name="account_id" required={type !== 'stock_receipt'} value={accountId} onValueChange={(val) => setAccountId(val || '')}>
@@ -736,6 +752,21 @@ export function TransactionForm({ accounts, safes, employees = [], stocks = [] }
                       )}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {type === 'expense' && (
+                <div className="space-y-2">
+                  <Label htmlFor="expenseType">Gider Türü (Örn: Kira, Elektrik, Kırtasiye)</Label>
+                  <Input 
+                    id="expenseType" 
+                    name="expenseType"
+                    required 
+                    value={expenseType}
+                    onChange={(e) => setExpenseType(e.target.value)}
+                    placeholder="Gider türünü yazın..." 
+                    className="h-12 rounded-xl bg-background border-muted"
+                  />
                 </div>
               )}
 

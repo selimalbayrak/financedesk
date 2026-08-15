@@ -17,6 +17,8 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Account, TransactionWithLines } from '@/types/database.types'
 import { ChequeCashModal } from '../finance/cheque-cash-modal'
 import { deleteChequeNote } from '@/features/finance/actions'
+import { CariTransactionSheet } from './cari-transaction-sheet'
+import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 
 interface AccountDetailViewProps {
   account: Account
@@ -32,6 +34,9 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
   const [editOpen, setEditOpen] = useState(false)
   const [cashModalOpen, setCashModalOpen] = useState(false)
   const [selectedCheque, setSelectedCheque] = useState<any>(null)
+  
+  const [cariSheetOpen, setCariSheetOpen] = useState(false)
+  const [cariDirection, setCariDirection] = useState<'COLLECTION' | 'PAYMENT'>('COLLECTION')
 
   // Balance Logic
   // (+) Alacağımız: invoice_out, payment_out
@@ -81,12 +86,28 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href="/transactions/import">
-            <Button size="sm" variant="outline" className="rounded-xl">
-              <Upload className="mr-1.5 h-4 w-4" />
-              PDF'den Aktar
-            </Button>
-          </Link>
+          <Button 
+            size="sm" 
+            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+            onClick={() => {
+              setCariDirection('COLLECTION')
+              setCariSheetOpen(true)
+            }}
+          >
+            <ArrowDownCircle className="mr-1.5 h-4 w-4" />
+            Para Al (Tahsilat)
+          </Button>
+          <Button 
+            size="sm" 
+            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white"
+            onClick={() => {
+              setCariDirection('PAYMENT')
+              setCariSheetOpen(true)
+            }}
+          >
+            <ArrowUpCircle className="mr-1.5 h-4 w-4" />
+            Para Gönder (Ödeme)
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="rounded-xl">
             <Pencil className="mr-1.5 h-4 w-4" />
             Düzenle
@@ -298,6 +319,16 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
         cheque={selectedCheque}
         safes={safes}
         accounts={modalAccounts}
+      />
+
+      <CariTransactionSheet
+        open={cariSheetOpen}
+        onOpenChange={setCariSheetOpen}
+        accountId={account.id}
+        accountName={account.company_name || account.name}
+        safes={safes}
+        companyId={companyId}
+        direction={cariDirection}
       />
     </>
   )

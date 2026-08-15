@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import {
   Sheet,
   SheetContent,
@@ -30,86 +31,89 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
-import { employeeTransactionSchema, type EmployeeTransactionFormValues } from '@/lib/validations'
-import { createClient } from '@/lib/supabase/client'
 import type { SafeBalance } from '@/types/database.types'
-import { processPersonnelTransaction } from '@/features/accounting/rpc-actions'
+import { processCariPayment } from '@/features/accounting/rpc-actions'
+import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
-interface EmployeeTransactionSheetProps {
+const formSchema = z.object({
+  safe_id: z.string().min(1, 'Kasa/Banka seçmelisiniz.'),
+  amount: z.number().min(0.01, 'Tutar 0 dan büyük olmalıdır.'),
+  date: z.string().min(1, 'Tarih seçmelisiniz.'),
+  description: z.string().optional(),
+})
+
+interface CariTransactionSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  employeeId: string
+  accountId: string
+  accountName: string
   safes: SafeBalance[]
   companyId: string
-  wageAmount: number
-  wageType: string
+  direction: 'COLLECTION' | 'PAYMENT'
 }
 
-export function EmployeeTransactionSheet({ 
+export function CariTransactionSheet({ 
   open, 
   onOpenChange, 
-  employeeId, 
-  safes, 
-  companyId, 
-  wageAmount,
-  wageType 
-}: EmployeeTransactionSheetProps) {
+  accountId,
+  accountName,
+  safes,
+  companyId,
+  direction
+}: CariTransactionSheetProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const form = useForm<EmployeeTransactionFormValues>({
-    resolver: zodResolver(employeeTransactionSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      transaction_type: 'advance_payment',
+      safe_id: '',
       amount: 0,
       date: new Date().toISOString().split('T')[0],
-      description: '',
-      safe_id: '',
+      description: direction === 'COLLECTION' ? 'Cari Tahsilat' : 'Cari Ödeme',
     },
   })
 
-  const watchTxType = form.watch('transaction_type')
-  useEffect(() => {
-    if (watchTxType === 'advance_payment') {
-      form.setValue('description', 'Avans Ödemesi')
-    } else if (watchTxType === 'salary_payment') {
-      form.setValue('description', 'Maaş Ödemesi')
-    } else if (watchTxType === 'accrual' as any) {
-      form.setValue('description', 'Aylık Maaş Hakedişi')
-    }
-  }, [watchTxType, form])
+  // Reset form description when direction changes
+  useState(() => {
+    form.setValue('description', direction === 'COLLECTION' ? 'Cari Tahsilat' : 'Cari Ödeme')
+  })
 
-  async function onSubmit(values: EmployeeTransactionFormValues) {
-    const supabase = createClient()
-    const cleanValues = {
-      ...values,
-      amount: Math.round(values.amount * 100),
-      safe_id: values.safe_id === '' ? null : values.safe_id,
-      company_id: companyId,
-      employee_id: employeeId
-    }
-
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
-      // 1. Employee UI log
-      await supabase.from('employee_transactions').insert(cleanValues)
+      // Create standard transaction (for UI history)
+      const supabase = createClient()
+      await supabase.from('transactions').insert({
+        company_id: companyId,
+        account_id: accountId,
+        safe_id: values.safe_id,
+        transaction_type: direction === 'COLLECTION' ? 'payment_in' : 'payment_out',
+        amount: Math.round(values.amount * 100),
+        transaction_date: values.date,
+        description: values.description,
+        payment_method: 'Nakit'
+      })
 
       // 2. Accounting RPC
-      const { data: empData } = await supabase.from('employees').select('name').eq('id', employeeId).single()
-      if (empData) {
-        const type = (values.transaction_type === 'accrual' as any) ? 'ACCRUAL' : 'PAYMENT'
-        await processPersonnelTransaction(
-          empData.name,
-          cleanValues.amount, // Send cents
-          cleanValues.safe_id,
-          cleanValues.date,
-          cleanValues.description || (type === 'ACCRUAL' ? 'Maaş Hakedişi' : 'Personel Ödemesi'),
-          type
-        )
-      }
+      const result = await processCariPayment(
+        accountId,
+        values.safe_id,
+        values.amount * 100, // Pass cents or TL? Our previous RPC for expense takes TL... Wait, let's check what processExpensePayment does. It inserts p_amount to debit. So if we want cents in DB, we should pass cents to RPC.
+        // Let's pass CENTS because journal_entry_lines uses cents everywhere in this app.
+        values.date,
+        values.description || (direction === 'COLLECTION' ? 'Tahsilat' : 'Ödeme'),
+        direction
+      )
 
-      onOpenChange(false)
-      form.reset()
-      router.refresh()
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        toast.success('İşlem başarıyla kaydedildi.')
+        onOpenChange(false)
+        form.reset()
+        router.refresh()
+      }
     })
   }
 
@@ -117,9 +121,9 @@ export function EmployeeTransactionSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Personel İşlemi Ekle</SheetTitle>
+          <SheetTitle>{direction === 'COLLECTION' ? 'Para Al (Tahsilat)' : 'Para Gönder (Ödeme)'}</SheetTitle>
           <SheetDescription>
-            Avans veya maaş ödemesi yapın. Hakedişler takvim üzerinden hesaplanır.
+            {accountName} carisine ait {direction === 'COLLECTION' ? 'tahsilat' : 'ödeme'} işlemini giriyorsunuz.
           </SheetDescription>
         </SheetHeader>
 
@@ -128,53 +132,28 @@ export function EmployeeTransactionSheet({
             
             <FormField
               control={form.control}
-              name="transaction_type"
+              name="safe_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>İşlem Türü *</FormLabel>
+                  <FormLabel>{direction === 'COLLECTION' ? 'Paranın Gireceği Kasa/Banka *' : 'Paranın Çıkacağı Kasa/Banka *'}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Tür seçin" />
+                        <SelectValue placeholder="Kasa seçin" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="accrual">Maaş Hakedişi (Tahakkuk)</SelectItem>
-                      <SelectItem value="advance_payment">Avans Ödemesi</SelectItem>
-                      <SelectItem value="salary_payment">Maaş Ödemesi</SelectItem>
+                      {safes.map(safe => (
+                        <SelectItem key={safe.id} value={safe.id}>
+                          {safe.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            {(watchTxType === 'advance_payment' || watchTxType === 'salary_payment') && (
-              <FormField
-                control={form.control}
-                name="safe_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ödemenin Yapılacağı Kasa *</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Kasa seçin" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {safes.map(safe => (
-                          <SelectItem key={safe.id} value={safe.id}>
-                            {safe.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
             
             <FormField
               control={form.control}
