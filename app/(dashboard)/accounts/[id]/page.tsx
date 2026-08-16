@@ -18,6 +18,8 @@ export async function generateMetadata({ params }: AccountDetailPageProps): Prom
   }
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function AccountDetailPage({ params }: AccountDetailPageProps) {
   const { id } = await params
   const companyInfo = await getActiveCompany()

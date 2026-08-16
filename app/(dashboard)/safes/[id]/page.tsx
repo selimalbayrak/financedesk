@@ -3,6 +3,8 @@ import { getActiveCompany } from '@/lib/company'
 import { SafeDetailsClient } from '@/features/safes/safe-details-client'
 import { redirect } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+
 export default async function SafeDetailsPage({ params }: { params: { id: string } }) {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) {

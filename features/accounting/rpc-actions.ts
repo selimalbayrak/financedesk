@@ -96,7 +96,6 @@ export async function processCariPayment(
     return { success: false, error: error.message }
   }
 
-  revalidatePath('/accounts')
-  revalidatePath('/accounting/journals')
+  revalidatePath('/', 'layout')
   return { success: true }
 }

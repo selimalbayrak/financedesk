@@ -3,6 +3,8 @@ import { getActiveCompany } from '@/lib/company'
 import { redirect } from 'next/navigation'
 import { WarehousesClient } from '@/features/warehouses/warehouses-client'
 
+export const dynamic = 'force-dynamic'
+
 export default async function WarehousesPage() {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) {

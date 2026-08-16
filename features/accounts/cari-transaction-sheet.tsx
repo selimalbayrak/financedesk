@@ -82,9 +82,8 @@ export function CariTransactionSheet({
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
-      // Create standard transaction (for UI history)
       const supabase = createClient()
-      await supabase.from('transactions').insert({
+      const { error: txError } = await supabase.from('transactions').insert({
         company_id: companyId,
         account_id: accountId,
         safe_id: values.safe_id,
@@ -95,12 +94,16 @@ export function CariTransactionSheet({
         payment_method: 'Nakit'
       })
 
+      if (txError) {
+        toast.error('İşlem kaydedilemedi (Transactions): ' + txError.message)
+        return
+      }
+
       // 2. Accounting RPC
       const result = await processCariPayment(
         accountId,
         values.safe_id,
-        values.amount * 100, // Pass cents or TL? Our previous RPC for expense takes TL... Wait, let's check what processExpensePayment does. It inserts p_amount to debit. So if we want cents in DB, we should pass cents to RPC.
-        // Let's pass CENTS because journal_entry_lines uses cents everywhere in this app.
+        values.amount * 100, // Cents
         values.date,
         values.description || (direction === 'COLLECTION' ? 'Tahsilat' : 'Ödeme'),
         direction
