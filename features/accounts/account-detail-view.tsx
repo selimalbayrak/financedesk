@@ -87,12 +87,10 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
         </div>
         <div className="flex gap-2">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground">
+            <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-3 rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Plus className="mr-2 h-4 w-4" />
                 Yeni İşlem
                 <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 rounded-xl p-2">
               <DropdownMenuItem onClick={() => router.push(`/invoices/new?type=SALES_INVOICE&accountId=${account.id}`)} className="cursor-pointer py-2">
