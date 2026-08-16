@@ -48,6 +48,14 @@ export function QuickActionsClient() {
       hover: 'hover:border-violet-500/50 hover:shadow-violet-500/20'
     },
     {
+      title: 'Çek / Senet İşlemi',
+      description: 'Müşteriden alınan veya tedarikçiye verilen evraklar.',
+      icon: <FileText className="w-8 h-8 text-indigo-600" />,
+      href: '/finance',
+      color: 'bg-indigo-50 dark:bg-indigo-900/20',
+      hover: 'hover:border-indigo-500/50 hover:shadow-indigo-500/20'
+    },
+    {
       title: 'Yeni Cari Ekle',
       description: 'Sisteme yeni bir müşteri veya tedarikçi kaydedin.',
       icon: <Building2 className="w-8 h-8 text-orange-600" />,

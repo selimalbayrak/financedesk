@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { ArrowDownCircle, ArrowUpCircle, Activity, Wallet, PackagePlus, Settings, Users, Landmark } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Activity, Wallet, PackagePlus, Settings, Users, Landmark, CarFront } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -37,19 +37,24 @@ interface DashboardData {
     totalChequesIn: number
     totalChequesOut: number
   }
+  assetsSummary?: {
+    totalValue: number
+    count: number
+  }
 }
 
 interface DashboardClientProps {
   data: DashboardData
 }
 
-type WidgetKey = 'kpi' | 'transactions' | 'employees' | 'finance'
+type WidgetKey = 'kpi' | 'transactions' | 'employees' | 'finance' | 'assets'
 
 const WIDGET_NAMES: Record<WidgetKey, string> = {
   kpi: 'Özet (Cari Alacak/Borç)',
   transactions: 'Son İşlemler',
   employees: 'Personel Maaş ve Avansları',
-  finance: 'Kredi ve Çek/Senet Özetleri'
+  finance: 'Kredi ve Çek/Senet Özetleri',
+  assets: 'Maddi Duran Varlıklar Özeti'
 }
 
 export function DashboardClient({ data }: DashboardClientProps) {
@@ -57,7 +62,8 @@ export function DashboardClient({ data }: DashboardClientProps) {
     kpi: true,
     transactions: true,
     employees: true,
-    finance: true
+    finance: true,
+    assets: true
   })
   const [mounted, setMounted] = useState(false)
 
@@ -239,6 +245,40 @@ export function DashboardClient({ data }: DashboardClientProps) {
                     {formatCurrency(data.financeSummary.totalChequesOut)}
                   </span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Fixed Assets Summary Widget */}
+        {widgets.assets && data.assetsSummary && (
+          <Card className="border-border/50 shadow-sm md:col-span-1">
+            <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-2 text-primary">
+                <CarFront className="w-4 h-4" />
+                <CardTitle className="text-sm font-semibold">Maddi Duran Varlıklar Özeti</CardTitle>
+              </div>
+              <Link href="/assets">
+                <Button variant="ghost" size="sm" className="h-8 rounded-full text-xs text-primary">
+                  Tümünü Gör
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between p-4 bg-cyan-500/5 rounded-2xl border border-cyan-500/10">
+                <div>
+                  <span className="text-xs text-muted-foreground block">Toplam Varlık Değeri</span>
+                  <span className="text-xl font-bold text-cyan-600">
+                    {formatCurrency(data.assetsSummary.totalValue)}
+                  </span>
+                </div>
+                <div className="bg-cyan-500/10 p-3 rounded-xl text-cyan-600">
+                  <CarFront className="w-6 h-6" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border">
+                <span className="text-sm font-medium">Aktif Varlık Sayısı</span>
+                <span className="text-lg font-bold">{data.assetsSummary.count} Adet</span>
               </div>
             </CardContent>
           </Card>

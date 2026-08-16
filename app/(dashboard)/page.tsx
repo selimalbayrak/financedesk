@@ -90,6 +90,16 @@ export default async function DashboardPage() {
   const totalChequesIn = (activeCheques ?? []).filter(c => c.direction === 'in').reduce((sum, c) => sum + c.amount, 0)
   const totalChequesOut = (activeCheques ?? []).filter(c => c.direction === 'out').reduce((sum, c) => sum + c.amount, 0)
 
+  // 5. Get Fixed Assets summary
+  const { data: assetsRaw } = await supabase
+    .from('fixed_assets')
+    .select('purchase_price, current_value, status')
+    .eq('company_id', companyInfo.id)
+
+  const activeAssets = (assetsRaw ?? []).filter(a => a.status === 'active')
+  const totalAssetsValue = activeAssets.reduce((sum, a) => sum + (a.current_value || a.purchase_price || 0), 0)
+  const totalAssetsCount = activeAssets.length
+
   const dashboardData = {
     totalReceivable,
     totalPayable,
@@ -100,6 +110,10 @@ export default async function DashboardPage() {
       totalLoanRemaining,
       totalChequesIn,
       totalChequesOut
+    },
+    assetsSummary: {
+      totalValue: totalAssetsValue,
+      count: totalAssetsCount
     }
   }
 

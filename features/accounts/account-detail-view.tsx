@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard, Upload, MoreVertical, Trash2 } from 'lucide-react'
+import { ChevronLeft, Pencil, Mail, Phone, MapPin, Building2, Hash, CreditCard, Upload, MoreVertical, Trash2, ChevronDown, FileText, Plus, Receipt, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -18,7 +18,7 @@ import type { Account, TransactionWithLines } from '@/types/database.types'
 import { ChequeCashModal } from '../finance/cheque-cash-modal'
 import { deleteChequeNote } from '@/features/finance/actions'
 import { CariTransactionSheet } from './cari-transaction-sheet'
-import { ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+
 
 interface AccountDetailViewProps {
   account: Account
@@ -86,28 +86,47 @@ export function AccountDetailView({ account, transactions, cheques = [], safes =
           </div>
         </div>
         <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={() => {
-              setCariDirection('COLLECTION')
-              setCariSheetOpen(true)
-            }}
-          >
-            <ArrowDownCircle className="mr-1.5 h-4 w-4" />
-            Para Al (Tahsilat)
-          </Button>
-          <Button 
-            size="sm" 
-            className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white"
-            onClick={() => {
-              setCariDirection('PAYMENT')
-              setCariSheetOpen(true)
-            }}
-          >
-            <ArrowUpCircle className="mr-1.5 h-4 w-4" />
-            Para Gönder (Ödeme)
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="rounded-xl shadow-md bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Plus className="mr-2 h-4 w-4" />
+                Yeni İşlem
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl p-2">
+              <DropdownMenuItem onClick={() => router.push(`/invoices/new?type=SALES_INVOICE&accountId=${account.id}`)} className="cursor-pointer py-2">
+                <FileText className="mr-2 h-4 w-4 text-blue-600" />
+                <span>Satış Faturası Kes</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/invoices/new?type=PURCHASE_INVOICE&accountId=${account.id}`)} className="cursor-pointer py-2">
+                <Receipt className="mr-2 h-4 w-4 text-orange-600" />
+                <span>Alış Faturası Gir</span>
+              </DropdownMenuItem>
+              
+              <div className="h-px bg-border my-1" />
+              
+              <DropdownMenuItem onClick={() => { setCariDirection('COLLECTION'); setCariSheetOpen(true) }} className="cursor-pointer py-2">
+                <ArrowDownCircle className="mr-2 h-4 w-4 text-emerald-600" />
+                <span>Para Al (Tahsilat)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setCariDirection('PAYMENT'); setCariSheetOpen(true) }} className="cursor-pointer py-2">
+                <ArrowUpCircle className="mr-2 h-4 w-4 text-rose-600" />
+                <span>Para Gönder (Ödeme)</span>
+              </DropdownMenuItem>
+
+              <div className="h-px bg-border my-1" />
+
+              <DropdownMenuItem onClick={() => router.push(`/finance?action=new-cheque&accountId=${account.id}`)} className="cursor-pointer py-2">
+                <CreditCard className="mr-2 h-4 w-4 text-indigo-600" />
+                <span>Çek / Senet Al</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/finance?action=new-cheque-out&accountId=${account.id}`)} className="cursor-pointer py-2">
+                <CreditCard className="mr-2 h-4 w-4 text-violet-600" />
+                <span>Çek / Senet Ver</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={() => setEditOpen(true)} className="rounded-xl">
             <Pencil className="mr-1.5 h-4 w-4" />
             Düzenle
