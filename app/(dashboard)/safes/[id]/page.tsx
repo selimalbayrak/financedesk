@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SafeDetailsPage({ params }: { params: { id: string } }) {
+export default async function SafeDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const companyInfo = await getActiveCompany()
   if (!companyInfo) {
     redirect('/companies')
@@ -16,7 +17,7 @@ export default async function SafeDetailsPage({ params }: { params: { id: string
   const { data: safe } = await supabase
     .from('safes')
     .select('*, chart_of_accounts(id, code, name)')
-    .eq('id', params.id)
+    .eq('id', id)
     .eq('company_id', companyInfo.id)
     .single()
 

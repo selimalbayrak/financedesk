@@ -70,7 +70,8 @@ export function SafesTable({ data }: SafesTableProps) {
   async function handleDelete() {
     if (!deleteSafeItem) return
     
-    if (deleteSafeItem.balance !== 0) {
+    const bal = Number(deleteSafeItem.balance) || 0
+    if (bal !== 0) {
       toast.error('Bakiyesi olan bir kasayı/bankayı silemezsiniz! Lütfen önce bakiyeyi sıfırlayın.')
       setDeleteSafeItem(null)
       return

@@ -115,7 +115,7 @@ export function WarehousesClient({ warehouses }: WarehousesClientProps) {
 
               <div>
                 <h3 className="font-semibold text-lg line-clamp-1" title={warehouse.name}>
-                  {(warehouse as any).chart_of_accounts?.code ? `${(warehouse as any).chart_of_accounts.code} - ` : ''}{warehouse.name}
+                  {warehouse.name}
                 </h3>
                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
                   <MapPin className="w-3.5 h-3.5" />

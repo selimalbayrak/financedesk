@@ -83,16 +83,19 @@ export function CariTransactionSheet({
   async function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
       const supabase = createClient()
+      const txType = direction === 'COLLECTION' ? 'payment_in' : 'payment_out'
       const { error: txError } = await supabase.from('transactions').insert({
         company_id: companyId,
         account_id: accountId,
         safe_id: values.safe_id,
-        transaction_type: direction === 'COLLECTION' ? 'payment_in' : 'payment_out',
+        transaction_type: txType,
+        category: txType,
+        currency: 'TRY',
         amount: Math.round(values.amount * 100),
         transaction_date: values.date,
         description: values.description,
         payment_method: 'Nakit'
-      })
+      } as any)
 
       if (txError) {
         toast.error('İşlem kaydedilemedi (Transactions): ' + txError.message)
