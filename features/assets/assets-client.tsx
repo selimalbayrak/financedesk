@@ -267,7 +267,7 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                   <SelectContent className="z-[200]">
                     {targetAccounts.map(a => (
                       <SelectItem key={a.id} value={a.id}>
-                        {a.chart_of_accounts?.code ? `${a.chart_of_accounts.code} - ${a.name}` : a.name}
+                        {(a as any).chart_of_accounts?.code ? `${(a as any).chart_of_accounts.code} - ${a.name}` : a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
