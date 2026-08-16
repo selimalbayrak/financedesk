@@ -2,8 +2,6 @@ import { getActiveCompany } from '@/lib/company'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SafesTable } from '@/features/safes/safes-table'
-import { SafeFormSheet } from '@/features/safes/safe-form-sheet'
-import { SafeTransferForm } from '@/features/safes/safe-transfer-form'
 
 export const dynamic = 'force-dynamic'
 

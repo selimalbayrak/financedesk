@@ -117,3 +117,32 @@ export async function deleteFixedAsset(id: string) {
   revalidatePath('/assets')
   return { success: true }
 }
+
+export async function updateFixedAsset(id: string, data: {
+  name: string
+  purchase_date?: string
+  purchase_price?: number
+  address?: string
+  description?: string
+}) {
+  const companyInfo = await getActiveCompany()
+  if (!companyInfo) return { error: 'Şirket bulunamadı' }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('fixed_assets')
+    .update({
+      name: data.name,
+      ...(data.purchase_date && { purchase_date: data.purchase_date }),
+      ...(data.purchase_price !== undefined && { purchase_price: data.purchase_price }),
+      ...(data.address !== undefined && { address: data.address }),
+      ...(data.description !== undefined && { description: data.description }),
+    } as any)
+    .eq('id', id)
+    .eq('company_id', companyInfo.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/assets')
+  return { success: true }
+}

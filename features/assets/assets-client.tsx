@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Search, CarFront, Landmark, Computer, Trash2, ArrowRightLeft } from 'lucide-react'
+import { Plus, Search, Computer, Trash2, ArrowRightLeft, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { createFixedAsset, sellFixedAsset, deleteFixedAsset } from './actions'
+import { createFixedAsset, sellFixedAsset, deleteFixedAsset, updateFixedAsset } from './actions'
 import { toast } from 'sonner'
 import type { FixedAsset, ChartOfAccount, Account } from '@/types/database.types'
 
@@ -22,6 +22,7 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showSellModal, setShowSellModal] = useState<FixedAsset | null>(null)
+  const [showEditModal, setShowEditModal] = useState<FixedAsset | null>(null)
   const [loading, setLoading] = useState(false)
 
   const filteredAssets = assets.filter(a => 
@@ -56,6 +57,33 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
     }
   }
 
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!showEditModal) return
+    setLoading(true)
+    const formData = new FormData(e.currentTarget as HTMLFormElement)
+
+    try {
+      const res = await updateFixedAsset(showEditModal.id, {
+        name: formData.get('name') as string,
+        purchase_date: formData.get('purchase_date') as string,
+        purchase_price: Math.round(parseFloat(formData.get('purchase_price') as string || '0') * 100),
+        address: formData.get('address') as string,
+        description: formData.get('description') as string,
+      })
+      if (res.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('Varlık bilgileri güncellendi!')
+        setShowEditModal(null)
+      }
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleSell(e: React.FormEvent) {
     e.preventDefault()
     if (!showSellModal) return
@@ -63,10 +91,10 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
     const formData = new FormData(e.currentTarget as HTMLFormElement)
     
     const sale_price = Math.round(parseFloat(formData.get('sale_price') as string || '0') * 100)
-    const target_account_id = formData.get('target_account_id') as string
+    const target_coa_id = formData.get('target_account_id') as string
 
     try {
-      const res = await sellFixedAsset(showSellModal.id, sale_price, target_account_id)
+      const res = await sellFixedAsset(showSellModal.id, sale_price, target_coa_id)
       if (res.error) {
         toast.error(res.error)
       } else {
@@ -145,7 +173,14 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                     filteredAssets.map(asset => (
                       <tr key={asset.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="p-4 font-mono text-xs">{asset.chart_of_accounts?.code}</td>
-                        <td className="p-4 font-medium">{asset.name}</td>
+                        <td className="p-4">
+                          <div>
+                            <span className="font-medium">{asset.name}</span>
+                            {(asset as any).address && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{(asset as any).address}</p>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-4">{new Date(asset.purchase_date).toLocaleDateString('tr-TR')}</td>
                         <td className="p-4 text-right font-medium">{formatCurrency(asset.purchase_price)}</td>
                         <td className="p-4 text-center">
@@ -160,14 +195,17 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                           )}
                         </td>
                         <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => setShowEditModal(asset)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg" title="Düzenle">
+                              <Pencil className="w-4 h-4" />
+                            </Button>
                             {asset.status === 'ACTIVE' && (
                               <Button variant="outline" size="sm" onClick={() => setShowSellModal(asset)} className="h-8 rounded-lg text-xs font-medium">
                                 <ArrowRightLeft className="w-3 h-3 mr-1.5" />
                                 Satış / Çıkış
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(asset.id)} className="h-8 w-8 text-muted-foreground hover:text-red-600 rounded-lg">
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(asset.id)} className="h-8 w-8 text-muted-foreground hover:text-red-600 rounded-lg" title="Sil">
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
@@ -189,7 +227,7 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
             <div className="flex justify-between items-center p-6 border-b">
               <h2 className="text-xl font-bold">Yeni Varlık Ekle</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowAddModal(false)} className="rounded-full">
-                <Search className="w-5 h-5 opacity-0" />
+                <X className="w-5 h-5" />
               </Button>
             </div>
             
@@ -224,10 +262,72 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label>Adres / Konum</Label>
+                <Input name="address" placeholder="Örn: İstanbul, Kadıköy, Caferağa Mah..." className="h-11 rounded-xl" />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Açıklama / Notlar</Label>
+                <textarea name="description" placeholder="Ek bilgi, plaka, tapu no, seri no vb." className="flex min-h-[80px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" />
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t mt-2">
                 <Button type="button" variant="outline" onClick={() => setShowAddModal(false)} className="rounded-xl h-11 px-6">İptal</Button>
                 <Button type="submit" disabled={loading} className="rounded-xl h-11 px-8 shadow-lg shadow-primary/25">
                   {loading ? 'Kaydediliyor...' : 'Kaydet'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card w-full max-w-lg rounded-3xl shadow-xl border overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold">Varlığı Düzenle</h2>
+                <p className="text-sm text-muted-foreground">{showEditModal.chart_of_accounts?.code} - {showEditModal.name}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowEditModal(null)} className="rounded-full">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <form onSubmit={handleEdit} className="p-6 flex flex-col gap-5 overflow-y-auto">
+              <div className="space-y-2">
+                <Label>Varlık Adı *</Label>
+                <Input name="name" required defaultValue={showEditModal.name} className="h-11 rounded-xl" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Alış Tarihi</Label>
+                  <Input type="date" name="purchase_date" defaultValue={showEditModal.purchase_date} className="h-11 rounded-xl" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maliyet / Alış Tutarı</Label>
+                  <Input type="number" step="0.01" name="purchase_price" defaultValue={(showEditModal.purchase_price / 100).toFixed(2)} className="h-11 rounded-xl text-right" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Adres / Konum</Label>
+                <Input name="address" defaultValue={(showEditModal as any).address || ''} placeholder="Örn: İstanbul, Kadıköy..." className="h-11 rounded-xl" />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Açıklama / Notlar</Label>
+                <textarea name="description" defaultValue={(showEditModal as any).description || ''} placeholder="Ek bilgi, plaka, tapu no, seri no vb." className="flex min-h-[80px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t mt-2">
+                <Button type="button" variant="outline" onClick={() => setShowEditModal(null)} className="rounded-xl h-11 px-6">İptal</Button>
+                <Button type="submit" disabled={loading} className="rounded-xl h-11 px-8 shadow-lg shadow-primary/25">
+                  {loading ? 'Kaydediliyor...' : 'Güncelle'}
                 </Button>
               </div>
             </form>
@@ -244,6 +344,9 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                 <h2 className="text-xl font-bold">Varlık Satışı / Çıkışı</h2>
                 <p className="text-sm text-muted-foreground">{showSellModal.name}</p>
               </div>
+              <Button variant="ghost" size="icon" onClick={() => setShowSellModal(null)} className="rounded-full">
+                <X className="w-5 h-5" />
+              </Button>
             </div>
             
             <form onSubmit={handleSell} className="p-6 flex flex-col gap-5">
@@ -265,8 +368,8 @@ export function AssetsClient({ assets, assetGroups, targetAccounts }: AssetsClie
                     <SelectValue placeholder="Kasa, Banka veya Cari Seçin..." />
                   </SelectTrigger>
                   <SelectContent className="z-[200]">
-                    {targetAccounts.map(a => (
-                      <SelectItem key={a.id} value={a.id}>
+                    {targetAccounts.filter(a => (a as any).chart_of_account_id).map(a => (
+                      <SelectItem key={a.id} value={(a as any).chart_of_account_id}>
                         {(a as any).chart_of_accounts?.code ? `${(a as any).chart_of_accounts.code} - ${a.name}` : a.name}
                       </SelectItem>
                     ))}

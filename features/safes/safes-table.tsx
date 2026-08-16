@@ -2,9 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { ColumnDef } from '@tanstack/react-table'
-import { Wallet, MoreHorizontal, Pencil, Trash2, ArrowUpDown, Loader2, ArrowRightLeft, Plus } from 'lucide-react'
+import { Wallet, MoreHorizontal, Pencil, Trash2, ArrowUpDown, Loader2, Plus, ArrowRightLeft } from 'lucide-react'
+import { SafeTransferForm } from './safe-transfer-form'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -69,13 +69,6 @@ export function SafesTable({ data }: SafesTableProps) {
 
   async function handleDelete() {
     if (!deleteSafeItem) return
-    
-    const bal = Number(deleteSafeItem.balance) || 0
-    if (bal !== 0) {
-      toast.error('Bakiyesi olan bir kasayı/bankayı silemezsiniz! Lütfen önce bakiyeyi sıfırlayın.')
-      setDeleteSafeItem(null)
-      return
-    }
 
     startDelete(async () => {
       try {
@@ -199,10 +192,7 @@ export function SafesTable({ data }: SafesTableProps) {
         description="Şirket içi nakit ve banka hesaplarınızı yönetin."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="rounded-xl bg-background/50 backdrop-blur-sm" disabled>
-              <ArrowRightLeft className="w-4 h-4 mr-2" />
-              Virman Yap
-            </Button>
+            <SafeTransferForm safes={data} />
             <Button 
               size="sm" 
               className="rounded-xl shadow-md"

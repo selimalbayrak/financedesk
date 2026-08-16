@@ -25,11 +25,12 @@ export default async function SafeDetailsPage({ params }: { params: Promise<{ id
     redirect('/safes')
   }
 
-  // Fetch transactions (journal_entry_lines) for this safe
-  let mappedTransactions = []
+  // Fetch transactions from BOTH sources and merge
+  let mappedTransactions: any[] = []
   
+  // Source 1: Journal entry lines (new muhasebe system)
   if (safe.chart_of_account_id) {
-    const { data: transactions } = await supabase
+    const { data: jelTx } = await supabase
       .from('journal_entry_lines')
       .select(`
         id,
@@ -46,32 +47,41 @@ export default async function SafeDetailsPage({ params }: { params: Promise<{ id
       .eq('chart_of_account_id', safe.chart_of_account_id)
       .order('created_at', { ascending: false })
 
-    mappedTransactions = (transactions || []).map(t => ({
+    const jelMapped = (jelTx || []).map(t => ({
       ...t,
-      amount: t.debit > 0 ? t.debit : t.credit,
-      is_debit: t.debit > 0
+      amount: Number(t.debit) > 0 ? Number(t.debit) : Number(t.credit),
+      is_debit: Number(t.debit) > 0,
+      source: 'journal'
     }))
-  } else {
-    // Fallback for old safes without chart_of_account_id (read from transactions table)
-    const { data: oldTx } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('safe_id', safe.id)
-      .order('transaction_date', { ascending: false })
-      
-    mappedTransactions = (oldTx || []).map(t => ({
-      id: t.id,
-      amount: t.amount,
-      is_debit: t.transaction_type.includes('in'),
-      created_at: t.created_at,
-      journal_entries: {
-        id: t.id,
-        date: t.transaction_date,
-        description: t.description || 'Eski İşlem',
-        type: 'OLD_TX'
-      }
-    }))
+    mappedTransactions.push(...jelMapped)
   }
+
+  // Source 2: Transactions table (legacy + cari payment inserts)
+  const { data: oldTx } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('safe_id', safe.id)
+    .is('deleted_at', null)
+    .order('transaction_date', { ascending: false })
+    
+  const oldMapped = (oldTx || []).map(t => ({
+    id: 'tx-' + t.id,
+    amount: Number(t.amount),
+    is_debit: t.transaction_type?.includes('in'),
+    created_at: t.created_at,
+    source: 'transactions',
+    journal_entries: {
+      id: t.id,
+      date: t.transaction_date,
+      description: t.description || t.transaction_type || 'İşlem',
+      type: 'TX'
+    }
+  }))
+  
+  // Deduplicate: if journal entries exist for the same operation, prefer journal. 
+  // Simple approach: include all from both sources, sort by date desc
+  mappedTransactions.push(...oldMapped)
+  mappedTransactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return <SafeDetailsClient safe={safe} transactions={mappedTransactions} />
 }
