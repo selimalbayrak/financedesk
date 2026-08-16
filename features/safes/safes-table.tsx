@@ -121,19 +121,17 @@ export function SafesTable({ data }: SafesTableProps) {
                 </TableCell>
                 <TableCell>
                   <DropdownMenu>
-                    <DropdownMenuTrigger render={
-                      <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    } />
+                    <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0 rounded-md" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setEditSafeItem(safe); setFormOpen(true) }}>
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditSafeItem(safe); setFormOpen(true) }}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Düzenle
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive focus:text-destructive"
-                        onClick={() => setDeleteSafeItem(safe)}
+                        onClick={(e) => { e.stopPropagation(); setDeleteSafeItem(safe) }}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Sil

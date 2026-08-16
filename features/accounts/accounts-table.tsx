@@ -70,6 +70,26 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
 
   const columns: ColumnDef<Account>[] = [
     {
+      id: 'account_code',
+      accessorFn: (row) => (row as any).account_code || '',
+      header: ({ column }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-3 h-8 font-semibold"
+          onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+        >
+          Kodu
+          <ArrowUpDown className="ml-1 h-3 w-3" />
+        </Button>
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-sm text-muted-foreground">
+          {(row.original as any).account_code || '—'}
+        </span>
+      ),
+    },
+    {
       accessorKey: 'name',
       header: ({ column }) => (
         <Button
@@ -88,7 +108,7 @@ export function AccountsTable({ accounts, companyId }: AccountsTableProps) {
             href={`/accounts/${row.original.id}`}
             className="font-medium hover:text-primary transition-colors"
           >
-            {(row.original as any).account_code ? `${(row.original as any).account_code} - ` : ''}{row.original.company_name || row.original.name}
+            {row.original.company_name || row.original.name}
           </Link>
           {row.original.company_name && (
             <p className="text-xs text-muted-foreground">{row.original.name}</p>
