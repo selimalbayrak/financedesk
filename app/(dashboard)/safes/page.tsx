@@ -40,17 +40,6 @@ export default async function SafesPage() {
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Kasalar ve Bankalar</h1>
-          <p className="text-muted-foreground">Şirket içi nakit ve banka hesaplarınızı yönetin.</p>
-        </div>
-        <div className="flex gap-3">
-          <SafeTransferForm safes={safes ?? []} />
-          <SafeFormSheet />
-        </div>
-      </div>
-
       <SafesTable data={safes ?? []} />
     </div>
   )

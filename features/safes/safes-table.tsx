@@ -70,8 +70,8 @@ export function SafesTable({ data }: SafesTableProps) {
   async function handleDelete() {
     if (!deleteSafeItem) return
     
-    if (deleteSafeItem.balance !== 0 || deleteSafeItem.total_in > 0 || deleteSafeItem.total_out > 0) {
-      toast.error('İşlem görmüş veya bakiyesi olan bir kasayı/bankayı silemezsiniz!')
+    if (deleteSafeItem.balance !== 0) {
+      toast.error('Bakiyesi olan bir kasayı/bankayı silemezsiniz! Lütfen önce bakiyeyi sıfırlayın.')
       setDeleteSafeItem(null)
       return
     }
@@ -123,12 +123,12 @@ export function SafesTable({ data }: SafesTableProps) {
         </Button>
       ),
       cell: ({ row }) => (
-        <Link href={`/safes/${row.original.id}`} className="font-medium hover:text-primary flex items-center gap-2">
+        <div className="font-medium hover:text-primary flex items-center gap-2">
           <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
             <Wallet className="w-4 h-4" />
           </div>
           {row.original.name}
-        </Link>
+        </div>
       ),
     },
     {
@@ -162,25 +162,31 @@ export function SafesTable({ data }: SafesTableProps) {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0 rounded-md">
-            <MoreHorizontal className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => { setEditSafeItem(row.original); setFormOpen(true) }}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Düzenle
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              className="text-destructive focus:text-destructive"
-              onClick={() => setDeleteSafeItem(row.original)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Sil
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0 rounded-md">
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push(`/safes/${row.original.id}`)}>
+                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                İncele
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setEditSafeItem(row.original); setFormOpen(true) }}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Düzenle
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="text-destructive focus:text-destructive"
+                onClick={() => setDeleteSafeItem(row.original)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Sil
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       ),
     },
   ]
@@ -222,6 +228,7 @@ export function SafesTable({ data }: SafesTableProps) {
           data={filtered}
           searchKey="name"
           searchPlaceholder="Kasa veya banka ara..."
+          onRowClick={(row) => router.push(`/safes/${row.id}`)}
           toolbar={
             <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
               <SelectTrigger className="h-9 w-36">

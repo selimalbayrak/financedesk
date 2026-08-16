@@ -35,6 +35,7 @@ interface DataTableProps<TData, TValue> {
   isLoading?: boolean
   emptyMessage?: string
   toolbar?: React.ReactNode
+  onRowClick?: (row: TData) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -46,6 +47,7 @@ export function DataTable<TData, TValue>({
   isLoading = false,
   emptyMessage = 'Kayıt bulunamadı.',
   toolbar,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -115,7 +117,8 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  className="transition-colors"
+                  className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                  onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
