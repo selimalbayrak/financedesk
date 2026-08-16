@@ -25,12 +25,12 @@ BEGIN
 
   IF p_direction = 'COLLECTION' THEN
     -- Müşteriden Para Aldık: Kasa BORÇ, Cari ALACAK
-    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, amount, is_debit) VALUES (v_je_id, p_safe_bank_account_id, p_amount, true);
-    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, amount, is_debit) VALUES (v_je_id, p_cari_account_id, p_amount, false);
+    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, debit, credit) VALUES (v_je_id, p_safe_bank_account_id, p_amount, 0);
+    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, debit, credit) VALUES (v_je_id, p_cari_account_id, 0, p_amount);
   ELSIF p_direction = 'PAYMENT' THEN
     -- Tedarikçiye Para Ödedik: Cari BORÇ, Kasa ALACAK
-    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, amount, is_debit) VALUES (v_je_id, p_cari_account_id, p_amount, true);
-    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, amount, is_debit) VALUES (v_je_id, p_safe_bank_account_id, p_amount, false);
+    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, debit, credit) VALUES (v_je_id, p_cari_account_id, p_amount, 0);
+    INSERT INTO public.journal_entry_lines (journal_entry_id, chart_of_account_id, debit, credit) VALUES (v_je_id, p_safe_bank_account_id, 0, p_amount);
   ELSE
     RAISE EXCEPTION 'Geçersiz işlem yönü (COLLECTION veya PAYMENT olmalıdır).';
   END IF;
