@@ -313,3 +313,22 @@ export async function createStockReceipt(data: {
   revalidatePath('/')
   return { success: true }
 }
+
+export async function deleteJournalEntry(id: string) {
+  const companyInfo = await getActiveCompany();
+  if (!companyInfo) return { error: 'Şirket bulunamadı' };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('journal_entries')
+    .delete()
+    .eq('id', id)
+    .eq('company_id', companyInfo.id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath('/transactions');
+  revalidatePath('/safes');
+  revalidatePath('/safes/[id]', 'page');
+  return { success: true };
+}
