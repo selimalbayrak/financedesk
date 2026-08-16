@@ -450,3 +450,17 @@ export type JournalEntry = Database['public']['Tables']['journal_entries']['Row'
 export type JournalEntryLine = Database['public']['Tables']['journal_entry_lines']['Row']
 export type Invoice = Database['public']['Tables']['invoices']['Row']
 export type InvoiceItem = Database['public']['Tables']['invoice_items']['Row']
+
+export interface FixedAsset {
+  id: string
+  company_id: string
+  chart_of_account_id: string
+  name: string
+  purchase_date: string
+  purchase_price: number
+  status: 'ACTIVE' | 'SOLD' | 'DISPOSED'
+  created_at: string
+  updated_at: string
+  created_by?: string
+  chart_of_accounts?: ChartOfAccount
+}

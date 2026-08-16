@@ -101,7 +101,7 @@ export function SafesTable({ data }: SafesTableProps) {
           </TableHeader>
           <TableBody>
             {data.map((safe) => (
-              <TableRow key={safe.id} className="hover:bg-muted/50 transition-colors">
+              <TableRow key={safe.id} className="hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => router.push(`/safes/${safe.id}`)}>
                 <TableCell className="font-medium flex items-center gap-2">
                   <div className="p-2 bg-primary/10 rounded-xl text-primary">
                     <Wallet className="w-4 h-4" />
@@ -122,7 +122,7 @@ export function SafesTable({ data }: SafesTableProps) {
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger render={
-                      <Button variant="ghost" className="h-8 w-8 p-0">
+                      <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     } />
