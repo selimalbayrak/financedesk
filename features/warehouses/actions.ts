@@ -14,7 +14,8 @@ export async function createWarehouse(data: { name: string }) {
   const { error } = await supabase.from('warehouses').insert({
     company_id: companyInfo.id,
     name: data.name,
-    created_by: authData.user?.id || null
+    created_by: authData.user?.id || null,
+    is_active: true
   } as any)
 
   if (error) throw new Error(error.message)

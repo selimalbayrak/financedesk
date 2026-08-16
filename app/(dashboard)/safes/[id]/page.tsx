@@ -23,22 +23,52 @@ export default async function SafeDetailsPage({ params }: { params: { id: string
   }
 
   // Fetch transactions (journal_entry_lines) for this safe
-  const { data: transactions } = await supabase
-    .from('journal_entry_lines')
-    .select(`
-      id,
-      amount,
-      is_debit,
-      created_at,
-      journal_entries (
+  let mappedTransactions = []
+  
+  if (safe.chart_of_account_id) {
+    const { data: transactions } = await supabase
+      .from('journal_entry_lines')
+      .select(`
         id,
-        date,
-        description,
-        type
-      )
-    `)
-    .eq('chart_of_account_id', safe.chart_of_account_id)
-    .order('created_at', { ascending: false })
+        debit,
+        credit,
+        created_at,
+        journal_entries (
+          id,
+          date,
+          description,
+          type
+        )
+      `)
+      .eq('chart_of_account_id', safe.chart_of_account_id)
+      .order('created_at', { ascending: false })
 
-  return <SafeDetailsClient safe={safe} transactions={transactions || []} />
+    mappedTransactions = (transactions || []).map(t => ({
+      ...t,
+      amount: t.debit > 0 ? t.debit : t.credit,
+      is_debit: t.debit > 0
+    }))
+  } else {
+    // Fallback for old safes without chart_of_account_id (read from transactions table)
+    const { data: oldTx } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('safe_id', safe.id)
+      .order('transaction_date', { ascending: false })
+      
+    mappedTransactions = (oldTx || []).map(t => ({
+      id: t.id,
+      amount: t.amount,
+      is_debit: t.transaction_type.includes('in'),
+      created_at: t.created_at,
+      journal_entries: {
+        id: t.id,
+        date: t.transaction_date,
+        description: t.description || 'Eski İşlem',
+        type: 'OLD_TX'
+      }
+    }))
+  }
+
+  return <SafeDetailsClient safe={safe} transactions={mappedTransactions} />
 }
