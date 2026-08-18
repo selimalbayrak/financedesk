@@ -749,7 +749,7 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
 
               <div className="space-y-1">
                 <Label>İlgili Depo (Opsiyonel)</Label>
-                <Select value={movementWarehouseId} onValueChange={(val) => setMovementWarehouseId(val)}>
+                <Select value={movementWarehouseId} onValueChange={(val) => setMovementWarehouseId(val || '')}>
                   <SelectTrigger className="h-9 rounded-lg">
                     <SelectValue placeholder="Depo seçin..." />
                   </SelectTrigger>
