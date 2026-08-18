@@ -81,7 +81,7 @@ export async function processCariPayment(
 
   const supabase = await createClient()
 
-  const { error } = await supabase.rpc('process_cari_payment', {
+  const { data, error } = await supabase.rpc('process_cari_payment', {
     p_company_id: companyInfo.id,
     p_cari_account_id: cariAccountId,
     p_safe_bank_account_id: safeBankAccountId,
@@ -97,5 +97,5 @@ export async function processCariPayment(
   }
 
   revalidatePath('/', 'layout')
-  return { success: true }
+  return { success: true, journalId: data }
 }

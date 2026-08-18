@@ -319,13 +319,32 @@ export async function deleteJournalEntry(id: string) {
   if (!companyInfo) return { error: 'Şirket bulunamadı' };
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from('journal_entries')
-    .delete()
-    .eq('id', id)
-    .eq('company_id', companyInfo.id);
 
-  if (error) return { error: error.message };
+  if (id.startsWith('tx-')) {
+    const txId = id.replace('tx-', '');
+    
+    // Check if it has a linked journal_entry
+    const { data: tx } = await supabase.from('transactions').select('journal_entry_id').eq('id', txId).single();
+    
+    if (tx?.journal_entry_id) {
+      // Delete the journal entry, which will cascade and delete the transaction too
+      const { error } = await supabase.from('journal_entries').delete().eq('id', tx.journal_entry_id).eq('company_id', companyInfo.id);
+      if (error) return { error: error.message };
+    } else {
+      // Just delete the legacy transaction
+      const { error } = await supabase.from('transactions').delete().eq('id', txId).eq('company_id', companyInfo.id);
+      if (error) return { error: error.message };
+    }
+  } else {
+    // It's a normal journal_entries ID
+    const { error } = await supabase
+      .from('journal_entries')
+      .delete()
+      .eq('id', id)
+      .eq('company_id', companyInfo.id);
+
+    if (error) return { error: error.message };
+  }
 
   revalidatePath('/transactions');
   revalidatePath('/safes');

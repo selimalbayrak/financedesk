@@ -82,27 +82,9 @@ export function CariTransactionSheet({
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     startTransition(async () => {
-      const supabase = createClient()
       const txType = direction === 'COLLECTION' ? 'payment_in' : 'payment_out'
-      const { error: txError } = await supabase.from('transactions').insert({
-        company_id: companyId,
-        account_id: accountId,
-        safe_id: values.safe_id,
-        transaction_type: txType,
-        category: txType,
-        currency: 'TRY',
-        amount: Math.round(values.amount * 100),
-        transaction_date: values.date,
-        description: values.description,
-        payment_method: 'Nakit'
-      } as any)
 
-      if (txError) {
-        toast.error('İşlem kaydedilemedi (Transactions): ' + txError.message)
-        return
-      }
-
-      // 2. Accounting RPC
+      // 1. Accounting RPC first to generate journal entries
       const result = await processCariPayment(
         accountId,
         values.safe_id,
@@ -114,12 +96,34 @@ export function CariTransactionSheet({
 
       if (result.error) {
         toast.error(result.error)
-      } else {
-        toast.success('İşlem başarıyla kaydedildi.')
-        onOpenChange(false)
-        form.reset()
-        router.refresh()
+        return
       }
+
+      // 2. Insert into legacy transactions table for UI/reporting
+      const supabase = createClient()
+      const { error: txError } = await supabase.from('transactions').insert({
+        company_id: companyId,
+        account_id: accountId,
+        safe_id: values.safe_id,
+        transaction_type: txType,
+        category: txType,
+        currency: 'TRY',
+        amount: Math.round(values.amount * 100),
+        transaction_date: values.date,
+        description: values.description,
+        payment_method: 'Nakit',
+        journal_entry_id: result.journalId
+      } as any)
+
+      if (txError) {
+        toast.error('İşlem kaydedilemedi (Transactions): ' + txError.message)
+        return
+      }
+
+      toast.success('İşlem başarıyla kaydedildi.')
+      onOpenChange(false)
+      form.reset()
+      router.refresh()
     })
   }
 

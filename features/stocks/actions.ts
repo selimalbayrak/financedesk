@@ -57,6 +57,7 @@ export async function createStock(data: {
   quantity_on_hand: number
   min_stock_level: number
   description?: string
+  warehouse_id?: string
 }) {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) return { error: 'Company not found' }
@@ -130,6 +131,7 @@ export async function createStock(data: {
       unit_price: data.unit_price,
       total_amount: data.quantity_on_hand * data.unit_price,
       notes: 'Başlangıç Stok Girişi',
+      destination_warehouse_id: data.warehouse_id || null,
       created_by
     } as any)
   }
@@ -203,6 +205,7 @@ export async function addStockMovement(data: {
   quantity: number
   unit_price: number
   notes?: string
+  warehouse_id?: string
 }) {
   const companyInfo = await getActiveCompany()
   if (!companyInfo) return { error: 'Company not found' }
@@ -228,38 +231,33 @@ export async function addStockMovement(data: {
 
   // 2. Insert transaction if account_id is provided
   if (data.account_id) {
-    if (user_id) {
-      const { data: trx, error: trxErr } = await supabase.from('transactions').insert({
-        user_id,
-        company_id: companyInfo.id,
-        account_id: data.account_id,
-        transaction_type: data.movement_type === 'in' ? 'invoice_in' : 'invoice_out', // Alış faturası (borç artar) veya Satış faturası (alacak artar)
-        category: 'Stok',
-        amount: total_amount,
-        currency: 'TRY',
-        transaction_date: new Date().toISOString().split('T')[0],
-        description: `Stok İşlemi: ${stock.name} - ${data.quantity} Adet`,
-        notes: data.notes || null,
-        created_by: user_id
-      } as any).select().single()
-      
-      if (!trxErr && trx) {
-        transaction_id = trx.id
-      }
-    }
+    const { data: tx, error: txErr } = await supabase.from('transactions').insert({
+      company_id: companyInfo.id,
+      account_id: data.account_id,
+      transaction_type: data.movement_type === 'in' ? 'expense' : 'income',
+      amount: total_amount,
+      description: data.notes || (data.movement_type === 'in' ? 'Stok Alımı' : 'Stok Satışı'),
+      transaction_date: new Date().toISOString().split('T')[0],
+      category: data.movement_type === 'in' ? 'expense' : 'income',
+      currency: 'TRY'
+    } as any).select().single()
+
+    if (txErr) return { error: 'İşlem kaydedilemedi: ' + txErr.message }
+    transaction_id = tx.id
   }
 
   // 3. Insert stock movement
   const { error: moveErr } = await supabase.from('stock_movements').insert({
     company_id: companyInfo.id,
     stock_id: data.stock_id,
-    account_id: data.account_id || null,
-    transaction_id: transaction_id,
     movement_type: data.movement_type,
     quantity: data.quantity,
     unit_price: data.unit_price,
     total_amount,
-    notes: data.notes || (data.movement_type === 'in' ? 'Stok Girişi (Alış)' : 'Stok Çıkışı (Satış)'),
+    notes: data.notes,
+    transaction_id,
+    destination_warehouse_id: data.movement_type === 'in' ? (data.warehouse_id || null) : null,
+    source_warehouse_id: data.movement_type === 'out' ? (data.warehouse_id || null) : null,
     created_by: user_id
   } as any)
 

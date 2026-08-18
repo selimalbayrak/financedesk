@@ -46,9 +46,10 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
   const [movementStock, setMovementStock] = useState<Stock | null>(null)
   const [movementType, setMovementType] = useState<'in' | 'out'>('in')
   const [movementQty, setMovementQty] = useState('1')
-  const [movementUnitPrice, setMovementUnitPrice] = useState('0')
+  const [movementUnitPrice, setMovementUnitPrice] = useState('')
   const [movementAccountId, setMovementAccountId] = useState('')
   const [movementNotes, setMovementNotes] = useState('')
+  const [movementWarehouseId, setMovementWarehouseId] = useState('')
 
   const [loading, setLoading] = useState(false)
 
@@ -130,6 +131,7 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
       quantity_on_hand: parseFloat(formData.get('quantity_on_hand') as string || '0'),
       min_stock_level: parseFloat(formData.get('min_stock_level') as string || '0'),
       description: formData.get('description') as string,
+      warehouse_id: formData.get('warehouse_id') === 'none' ? undefined : (formData.get('warehouse_id') as string || undefined),
     }
 
     try {
@@ -167,7 +169,8 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
         movement_type: movementType,
         quantity: parseFloat(movementQty || '0'),
         unit_price: Math.round(parseFloat(movementUnitPrice || '0') * 100),
-        notes: movementNotes || undefined
+        notes: movementNotes || undefined,
+        warehouse_id: movementWarehouseId === 'none' ? undefined : (movementWarehouseId || undefined)
       })
 
       if (res.error) {
@@ -439,7 +442,10 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
                                 onClick={() => {
                                   setMovementStock(stock)
                                   setMovementType('in')
+                                  setMovementQty('1')
                                   setMovementUnitPrice((stock.unit_price / 100).toString())
+                                  setMovementNotes('')
+                                  setMovementWarehouseId('')
                                   setShowMovementModal(true)
                                 }}
                               >
@@ -621,9 +627,27 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
 
 
 
-              <div className="space-y-1 mt-2">
-                <Label htmlFor="quantity_on_hand">Mevcut Stok Miktarı</Label>
-                <Input id="quantity_on_hand" name="quantity_on_hand" type="number" step="any" defaultValue={editStock?.quantity_on_hand || '0'} className="h-9 rounded-lg" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="quantity_on_hand">Başlangıç Stok Miktarı</Label>
+                  <Input id="quantity_on_hand" name="quantity_on_hand" type="number" step="any" defaultValue={editStock?.quantity_on_hand || '0'} className="h-9 rounded-lg" disabled={!!editStock} />
+                </div>
+                {!editStock && (
+                  <div className="space-y-1">
+                    <Label htmlFor="warehouse_id">Stok Hangi Depoya Girecek?</Label>
+                    <Select name="warehouse_id">
+                      <SelectTrigger className="h-9 rounded-lg">
+                        <SelectValue placeholder="Depo Seçin (İsteğe Bağlı)" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border z-[200]">
+                        <SelectItem value="none">Seçilmedi</SelectItem>
+                        {warehouses.map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="p-3 bg-muted/20 border rounded-xl space-y-2">
@@ -717,6 +741,23 @@ export function StocksClient({ stocks, movements, accounts, chartOfAccounts: ini
                     {accounts.map(acc => (
                       <SelectItem key={acc.id} value={acc.id}>
                         {acc.company_name || acc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label>İlgili Depo (Opsiyonel)</Label>
+                <Select value={movementWarehouseId} onValueChange={(val) => setMovementWarehouseId(val)}>
+                  <SelectTrigger className="h-9 rounded-lg">
+                    <SelectValue placeholder="Depo seçin..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border z-[200]">
+                    <SelectItem value="none">Seçim Yok</SelectItem>
+                    {warehouses.map(w => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
