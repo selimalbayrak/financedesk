@@ -71,7 +71,7 @@ export default async function SafeDetailsPage({ params }: { params: Promise<{ id
     created_at: t.created_at,
     source: 'transactions',
     journal_entries: {
-      id: t.id,
+      id: 'tx-' + t.id,
       date: t.transaction_date,
       description: t.description || t.transaction_type || 'İşlem',
       type: 'TX'
