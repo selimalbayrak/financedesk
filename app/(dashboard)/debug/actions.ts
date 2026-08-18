@@ -8,7 +8,7 @@ export async function runDebugTests() {
   if (!companyInfo) return { error: 'Aktif şirket bulunamadı.' }
 
   const supabase = await createClient()
-  const results = []
+  const results: { name: string; status: 'PASSED' | 'FAILED' | 'WARNING'; message: string }[] = []
 
   // 1. Check if Transactions table has journal_entry_id (Step 15 Migration check)
   const { error: txColError } = await supabase
